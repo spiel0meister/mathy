@@ -103,6 +103,9 @@ impl Parser {
                 };
                 left = Expr::NegFloatLiteral(val.to_string());
                 self.consume()?;
+            } else if let Token::LeftParen = &token {
+                self.consume()?;
+                left = self.parse_expr(1, is_function)?;
             } else {
                 return Err(error!(InvalidData, "Unexpected token: {:?}", token));
             }
