@@ -1,1 +1,47 @@
 # mathy
+
+A language meant for easy Math operations!
+
+## Quick Start
+
+Clone the repo, and run:
+```console
+cargo run -- <file-name>.mth
+```
+
+### Syntax
+
+In this language you can:
+
+1. Declare variables:
+```mth
+x = 2 * 5 + 1
+y = x * 2
+```
+
+2. Declare functions:
+```mth
+f(x) = x * 2
+g(x, y) = x + 1 / y
+```
+
+3. For-like loop--the from-to-as loop:
+```mth
+from 0 to 10 as x {
+    # Stuff...
+}
+```
+
+4. Print expressions:
+```mth
+f(x) = x * 2 - 2
+from 0 to 10 as x {
+    f(x) # The result will be printed out!
+}
+```
+
+## Todo
+
+- [ ] Built-in functions (sin, cos, tan, ...)
+- [ ] Constants (PI, TAN, GOLDEN RATIO, ...)
+- [ ] C-like macros to config interpretation (e.g. set angle mode to degrees, radian, or grad, ...)
