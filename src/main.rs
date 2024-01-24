@@ -22,7 +22,7 @@ fn get_file_path() -> Option<String> {
 
 fn main() -> Result<()> {
     let Some(file_path) = get_file_path() else {
-        return Err(Error::new(ErrorKind::InvalidInput, "Missing file path!"));
+        return Err(error!(InvalidInput, "Missing filepath!"));
     };
     let content = read_to_string(file_path)?;
 
