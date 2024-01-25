@@ -6,7 +6,7 @@ pub enum Token {
     Ident(String),
     FloatLiteral(String),
     Comment,
-    Unkown(char),
+    Unknown(char),
     Newline,
     Equals,
     LeftParen,
@@ -58,7 +58,7 @@ impl Lexer {
         let mut buf = String::new();
         buf.push(self.consume()?);
 
-        while self.peek(0).is_some() && self.peek(0).unwrap().is_ascii_alphabetic() {
+        while self.peek(0).is_some_and(|c| c.is_ascii_alphabetic()) {
             buf.push(self.consume()?);
         }
 
@@ -82,10 +82,9 @@ impl Lexer {
             buf.push(first);
         }
 
-        while self.peek(0).is_some()
-            && (self.peek(0).unwrap().is_digit(10)
-                || self.peek(0).unwrap() == '.'
-                || self.peek(0).unwrap() == '_')
+        while self
+            .peek(0)
+            .is_some_and(|c| c.is_digit(10) || c == '.' || c == '_')
         {
             if self.peek(0).unwrap() == '_' {
                 self.consume()?;
@@ -157,7 +156,7 @@ impl Lexer {
                 self.tokens.push(Token::RightBrace);
                 self.consume()?;
             } else {
-                self.tokens.push(Token::Unkown(c));
+                self.tokens.push(Token::Unknown(c));
                 self.consume()?;
             }
         }

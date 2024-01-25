@@ -76,13 +76,13 @@ impl Parser {
             if let Token::FloatLiteral(val) = &token {
                 left = Expr::FloatLiteral(val.to_string());
             } else if let Token::Ident(name) = &token {
-                if self.peek(1).is_some() && self.peek(1).unwrap() == &Token::LeftParen {
+                if self.peek(1).is_some_and(|t| t == &Token::LeftParen) {
                     self.consume()?;
                     self.consume()?;
 
                     let mut args: Vec<Expr> = Vec::new();
 
-                    while self.peek(0).is_some() && self.peek(0).unwrap() != &Token::RightParen {
+                    while self.peek(0).is_some_and(|t| t == &Token::RightParen) {
                         let arg = self.parse_expr(1, false)?;
                         args.push(arg);
                         if self.peek(0).unwrap() == &Token::Comma {
@@ -158,11 +158,10 @@ impl Parser {
             let t = self.peek(0).unwrap();
             match t {
                 Token::Ident(name) => {
-                    if self.peek(1).is_some() && self.peek(1).unwrap() == &Token::Equals {
+                    if self.peek(1).is_some_and(|t| t == &Token::Equals) {
                         let out = self.parse_declaration(name.to_string())?;
                         block.push(out);
-                    } else if self.peek(1).is_some()
-                        && self.peek(1).unwrap() == &Token::LeftParen
+                    } else if self.peek(1).is_some_and(|t| t == &Token::LeftParen)
                         && self.line_contains_equals()
                     {
                         let out = self.parse_function_declaration(name.to_string())?;
@@ -211,7 +210,7 @@ impl Parser {
         self.consume()?;
         self.consume()?;
 
-        while self.peek(0).is_some() && self.peek(0).unwrap() != &Token::RightParen {
+        while self.peek(0).is_some_and(|t| t == &Token::RightParen) {
             if let Token::Ident(name) = self.peek(0).unwrap() {
                 parameters.push(name.to_string());
             }
@@ -239,9 +238,11 @@ impl Parser {
                 return false;
             }
 
-            if self.peek(i).unwrap() == &Token::Newline {
+            let t = self.peek(i).unwrap();
+
+            if t == &Token::Newline {
                 return false;
-            } else if self.peek(i).unwrap() == &Token::Equals {
+            } else if t == &Token::Equals {
                 return true;
             }
         }
@@ -253,11 +254,10 @@ impl Parser {
         while let Some(cur) = self.peek(0) {
             match &cur {
                 Token::Ident(name) => {
-                    if self.peek(1).is_some() && self.peek(1).unwrap() == &Token::Equals {
+                    if self.peek(1).is_some_and(|t| t == &Token::Equals) {
                         let out = self.parse_declaration(name.to_string())?;
                         self.parsed.push(out);
-                    } else if self.peek(1).is_some()
-                        && self.peek(1).unwrap() == &Token::LeftParen
+                    } else if self.peek(1).is_some_and(|t| t == &Token::LeftParen)
                         && self.line_contains_equals()
                     {
                         let out = self.parse_function_declaration(name.to_string())?;
@@ -279,7 +279,7 @@ impl Parser {
                     self.parsed.push(out);
                 }
                 Token::Comment => {
-                    while self.peek(0).is_some() && self.peek(0).unwrap() != &Token::Newline {
+                    while let Some(Token::Newline) = self.peek(0) {
                         self.consume()?;
                     }
                 }

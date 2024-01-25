@@ -120,7 +120,6 @@ impl Interpreter {
     }
 
     fn execute_block(&mut self, block: Vec<Parsed>) -> Result<Scope> {
-        // println!("Block: {:?}", &block);
         let mut current = 0usize;
         let mut scope: Scope = Vec::new();
         while block.get(current).is_some() {
