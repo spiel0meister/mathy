@@ -24,7 +24,7 @@ pub enum Expr {
 #[derive(Debug, Clone)]
 pub enum Parsed {
     FunctionDecleration(Token, Vec<Token>, Expr),
-    FromLoop(Expr, Expr, Expr, Vec<Parsed>),
+    FromLoop(Expr, Expr, Expr, Expr, Vec<Parsed>),
     Declaration(Token, Expr),
     PrintExpr(Expr),
 }
@@ -159,7 +159,26 @@ impl Parser {
         let max = self.parse_expr(1, false)?;
         self.consume()?;
         let ident = self.parse_expr(1, false)?;
-        self.consume()?;
+        let step = if let Some(Token(TokenType::Keyword(keyword), _)) = self.peek(0) {
+            match keyword.as_str() {
+                "with" => {
+                    self.consume()?;
+                    self.consume()?;
+                    let expr = self.parse_expr(1, false)?;
+                    self.consume()?;
+                    expr
+                }
+                _ => {
+                    return Err(error!(
+                        Other,
+                        "Expected \"with\" keyword, got {:?} keyword", keyword
+                    ));
+                }
+            }
+        } else {
+            Expr::FloatLiteral("1".to_string())
+        };
+
         let mut block: Vec<Parsed> = Vec::new();
 
         while self
@@ -213,7 +232,7 @@ impl Parser {
         }
         self.consume()?;
 
-        Ok(Parsed::FromLoop(min, max, ident, block))
+        Ok(Parsed::FromLoop(min, max, ident, step, block))
     }
 
     fn parse_declaration(&mut self, ident: Token) -> Result<Parsed> {

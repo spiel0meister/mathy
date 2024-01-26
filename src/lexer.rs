@@ -78,12 +78,15 @@ impl Lexer {
         let mut buf = String::new();
         buf.push(self.consume()?);
 
-        while self.peek(0).is_some_and(|c| c.is_ascii_alphabetic()) {
+        while self
+            .peek(0)
+            .is_some_and(|c| c.is_ascii_alphabetic() || c.is_ascii_digit() || c == '_')
+        {
             buf.push(self.consume()?);
         }
 
         match buf.as_str() {
-            "from" | "to" | "as" => self.tokens.push(Token(
+            "from" | "to" | "as" | "with" | "step" => self.tokens.push(Token(
                 TokenType::Keyword(buf),
                 TokenLocation(self.file_path.clone(), col, row),
             )),
@@ -154,7 +157,7 @@ impl Lexer {
                 self.consume()?;
             } else if c.is_whitespace() {
                 self.consume()?;
-            } else if c.is_ascii_alphabetic() {
+            } else if c.is_ascii_alphabetic() || c == '_' {
                 self.parse_text(col + 1, line + 1)?;
             } else if c == '.' || c.is_digit(10) {
                 self.parse_float(col + 1, line + 1)?;

@@ -161,9 +161,10 @@ impl Interpreter {
                         .insert(f.to_string(), (parameters, expr.clone()));
                     scope.push(f.to_string());
                 }
-                Parsed::FromLoop(min_expr, max_expr, ident_expr, block) => {
+                Parsed::FromLoop(min_expr, max_expr, ident_expr, step_expr, block) => {
                     let min = self.evaluate_expr(&min_expr)?;
                     let max = self.evaluate_expr(&max_expr)?;
+                    let step = self.evaluate_expr(&step_expr)?;
                     let Expr::Ident(name) = ident_expr else {
                         return Err(error!(Other, "Internal error!"));
                     };
@@ -173,7 +174,7 @@ impl Interpreter {
                     while i <= max {
                         let scope = self.execute_block(block.to_vec())?;
                         self.clean_scope(scope)?;
-                        i += 1.0;
+                        i += step;
                         *self.variables.get_mut(&name).unwrap() = Expr::FloatLiteral(i.to_string());
                     }
                     self.variables.remove(&name);
