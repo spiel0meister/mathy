@@ -1,3 +1,4 @@
+use crate::lexer::{Token, TokenType};
 use crate::parser::{Expr, Operator, Parsed};
 use crate::util::error;
 
@@ -125,9 +126,12 @@ impl Interpreter {
         while block.get(current).is_some() {
             let parsed = block.get(current).unwrap().clone();
             match parsed {
-                Parsed::Declaration(name, expr) => {
+                Parsed::Declaration(Token(TokenType::Ident(name), loc), expr) => {
                     if let Some(_) = self.variables.get(&name) {
-                        return Err(error!(Other, "Re-decleration of variable {:?}", name));
+                        return Err(error!(
+                            Other,
+                            "Re-decleration of variable {:?} at {}", name, loc
+                        ));
                     }
                     self.variables.insert(name.to_string(), expr.clone());
                     scope.push(name.to_string());
@@ -136,19 +140,32 @@ impl Interpreter {
                     let value = self.evaluate_expr(&expr)?;
                     println!("{}", value);
                 }
-                Parsed::FunctionDecleration(f, parameters, expr) => {
+                Parsed::FunctionDecleration(Token(TokenType::Ident(f), loc), parameters, expr) => {
                     if let Some(_) = self.functions.get(&f) {
-                        return Err(error!(Other, "Re-decleration of function {:?}", f));
+                        return Err(error!(
+                            Other,
+                            "Re-decleration of function {:?} at {}", f, loc
+                        ));
                     }
+                    let parameters = parameters
+                        .iter()
+                        .map(|Token(t, _)| {
+                            if let TokenType::Ident(name) = t {
+                                name.to_string()
+                            } else {
+                                panic!("Internal error!");
+                            }
+                        })
+                        .collect();
                     self.functions
-                        .insert(f.to_string(), (parameters.to_vec(), expr.clone()));
+                        .insert(f.to_string(), (parameters, expr.clone()));
                     scope.push(f.to_string());
                 }
                 Parsed::FromLoop(min_expr, max_expr, ident_expr, block) => {
                     let min = self.evaluate_expr(&min_expr)?;
                     let max = self.evaluate_expr(&max_expr)?;
                     let Expr::Ident(name) = ident_expr else {
-                        return Err(error!(Other, "Some error!"));
+                        return Err(error!(Other, "Internal error!"));
                     };
                     let mut i = min;
                     self.variables
@@ -161,6 +178,8 @@ impl Interpreter {
                     }
                     self.variables.remove(&name);
                 }
+
+                _ => unreachable!("Internal error!"),
             }
             current += 1;
         }

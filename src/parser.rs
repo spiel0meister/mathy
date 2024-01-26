@@ -23,9 +23,9 @@ pub enum Expr {
 
 #[derive(Debug, Clone)]
 pub enum Parsed {
-    FunctionDecleration(String, Vec<String>, Expr),
+    FunctionDecleration(Token, Vec<Token>, Expr),
     FromLoop(Expr, Expr, Expr, Vec<Parsed>),
-    Declaration(String, Expr),
+    Declaration(Token, Expr),
     PrintExpr(Expr),
 }
 
@@ -169,19 +169,19 @@ impl Parser {
             let t = &self.peek(0).unwrap().0;
             let loc = &self.peek(0).unwrap().1;
             match t {
-                TokenType::Ident(name) => {
+                TokenType::Ident(_) => {
                     if self
                         .peek(1)
                         .is_some_and(|Token(t, _)| t == &TokenType::Equals)
                     {
-                        let out = self.parse_declaration(name.to_string())?;
+                        let out = self.parse_declaration(self.peek(0).unwrap().clone())?;
                         block.push(out);
                     } else if self
                         .peek(1)
                         .is_some_and(|Token(t, _)| t == &TokenType::LeftParen)
                         && self.line_contains_equals()
                     {
-                        let out = self.parse_function_declaration(name.to_string())?;
+                        let out = self.parse_function_declaration(self.peek(0).unwrap().clone())?;
                         block.push(out);
                     } else {
                         let out = self.parse_print()?;
@@ -216,16 +216,16 @@ impl Parser {
         Ok(Parsed::FromLoop(min, max, ident, block))
     }
 
-    fn parse_declaration(&mut self, name: String) -> Result<Parsed> {
+    fn parse_declaration(&mut self, ident: Token) -> Result<Parsed> {
         self.consume()?;
         self.consume()?;
         let expr = self.parse_expr(1, false)?;
-        Ok(Parsed::Declaration(name, expr))
+        Ok(Parsed::Declaration(ident, expr))
     }
 
-    fn parse_function_declaration(&mut self, name: String) -> Result<Parsed> {
+    fn parse_function_declaration(&mut self, ident: Token) -> Result<Parsed> {
         // println!("{:?}", &self.peek(0));
-        let mut parameters: Vec<String> = Vec::new();
+        let mut parameters: Vec<Token> = Vec::new();
         self.consume()?;
         self.consume()?;
 
@@ -233,19 +233,15 @@ impl Parser {
             .peek(0)
             .is_some_and(|Token(t, _)| t != &TokenType::RightParen)
         {
-            if let Token(TokenType::Ident(name), _) = self.peek(0).unwrap() {
-                parameters.push(name.to_string());
+            if let TokenType::Ident(_) = self.peek(0).unwrap().0 {
+                parameters.push(self.peek(0).unwrap().clone());
             }
             self.consume()?;
         }
         self.consume()?;
         self.consume()?;
         let expr = self.parse_expr(1, true)?;
-        Ok(Parsed::FunctionDecleration(
-            name.to_string(),
-            parameters,
-            expr,
-        ))
+        Ok(Parsed::FunctionDecleration(ident, parameters, expr))
     }
 
     fn parse_print(&mut self) -> Result<Parsed> {
@@ -275,21 +271,21 @@ impl Parser {
     pub fn parse(&mut self) -> Result<Vec<Parsed>> {
         // println!("Tokens: {:?}", &self.tokens);
         while let Some(Token(token_type, loc)) = self.peek(0) {
-            // println!("{:?}", cur);
+            let token = self.peek(0).unwrap().clone();
             match token_type {
-                TokenType::Ident(name) => {
+                TokenType::Ident(_) => {
                     if self
                         .peek(1)
                         .is_some_and(|Token(t, _)| t == &TokenType::Equals)
                     {
-                        let out = self.parse_declaration(name.to_string())?;
+                        let out = self.parse_declaration(token)?;
                         self.parsed.push(out);
                     } else if self
                         .peek(1)
                         .is_some_and(|Token(t, _)| t == &TokenType::LeftParen)
                         && self.line_contains_equals()
                     {
-                        let out = self.parse_function_declaration(name.to_string())?;
+                        let out = self.parse_function_declaration(token)?;
                         self.parsed.push(out);
                     } else {
                         let out = self.parse_print()?;

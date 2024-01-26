@@ -27,12 +27,6 @@ pub enum TokenType {
 #[derive(Debug, Clone)]
 pub struct Token(pub TokenType, pub TokenLocation);
 
-impl Token {
-    pub fn is_token_type(&self, token_type: TokenType) -> bool {
-        self.0 == token_type
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct TokenLocation(pub u32, pub u32);
 
