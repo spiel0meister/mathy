@@ -24,12 +24,45 @@ pub enum TokenType {
     Div,
 }
 
+impl Display for TokenType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let c = match self {
+            Self::Plus => "+",
+            Self::Minus => "-",
+            Self::Multi => "*",
+            Self::Div => "/",
+            Self::Comma => ",",
+            Self::LeftParen => "(",
+            Self::LeftBrace => "{",
+            Self::Equals => "=",
+            Self::Comment => "#",
+            Self::Newline => "\\n",
+            Self::FloatLiteral(literal) => literal,
+            Self::Ident(name) => name,
+            Self::Keyword(keyword) => keyword,
+            Self::RightParen => ")",
+            Self::RightBrace => "}",
+            Self::Unknown(c) => {
+                return write!(f, "{:?}", c);
+            }
+        };
+
+        write!(f, "{:?}", c)
+    }
+}
+
 #[derive(Debug, Clone)]
 /// The location of a [`Token`] in form (file name, column, row).
 pub struct TokenLocation(pub String, pub u32, pub u32);
 
 #[derive(Debug, Clone)]
 pub struct Token(pub TokenType, pub TokenLocation);
+
+impl Token {
+    pub fn exclude_loc(self) -> TokenType {
+        self.0
+    }
+}
 
 impl Display for TokenLocation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

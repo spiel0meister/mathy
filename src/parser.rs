@@ -115,7 +115,12 @@ impl Parser {
                 self.consume()?;
                 left = self.parse_expr(1, is_function)?;
             } else {
-                return Err(error!(InvalidData, "Unexpected token: {:?}", token));
+                return Err(error!(
+                    InvalidData,
+                    "Unexpected token {} at {}",
+                    token.clone().exclude_loc(),
+                    loc
+                ));
             }
             self.consume()?;
         } else {
@@ -159,25 +164,37 @@ impl Parser {
         let max = self.parse_expr(1, false)?;
         self.consume()?;
         let ident = self.parse_expr(1, false)?;
-        let step = if let Some(Token(TokenType::Keyword(keyword), _)) = self.peek(0) {
-            match keyword.as_str() {
-                "with" => {
-                    self.consume()?;
-                    self.consume()?;
-                    let expr = self.parse_expr(1, false)?;
-                    self.consume()?;
-                    expr
-                }
-                _ => {
+        let mut step: Expr = Expr::FloatLiteral("1.0".to_string());
+        let Some(t) = self.peek(0) else {
+            return Err(error!(UnexpectedEof, "EOF"));
+        };
+        let t = t.clone();
+        if let Token(TokenType::Keyword(keyword), loc) = t {
+            if keyword.as_str() == "with" {
+                self.consume()?;
+                let t = self.consume()?;
+                if let Token(TokenType::Keyword(keyword), loc) = t {
+                    if keyword.as_str() == "step" {
+                        step = self.parse_expr(1, false)?;
+                        self.consume()?;
+                    } else {
+                        return Err(error!(
+                            Other,
+                            "Expected \"step\" keyword, got {:?} keyword at {}",
+                            keyword.clone(),
+                            loc
+                        ));
+                    }
+                } else {
                     return Err(error!(
                         Other,
-                        "Expected \"with\" keyword, got {:?} keyword", keyword
+                        "Expected \"step\" keyword, got {} at {}",
+                        t.clone().exclude_loc(),
+                        loc
                     ));
-                }
+                };
             }
-        } else {
-            Expr::FloatLiteral("1".to_string())
-        };
+        }
 
         let mut block: Vec<Parsed> = Vec::new();
 
@@ -227,7 +244,7 @@ impl Parser {
                 TokenType::Newline => {
                     self.consume()?;
                 }
-                token => todo!("Handle: {:?}", token),
+                token => todo!("Handle: {:?} at {}", token, loc),
             }
         }
         self.consume()?;
@@ -313,7 +330,10 @@ impl Parser {
                 }
                 TokenType::Keyword(keyword) => {
                     if keyword.as_str() != "from" {
-                        return Err(error!(Other, "Unexpected keyword: {}", keyword));
+                        return Err(error!(
+                            Other,
+                            "Expected keyword \"from\", got keyword {:?} at {}", keyword, loc
+                        ));
                     }
                     let out = self.parse_from_block()?;
                     self.parsed.push(out);
@@ -330,11 +350,11 @@ impl Parser {
                 TokenType::Newline => {
                     self.consume()?;
                 }
-                TokenType::RightParen => {
-                    eprintln!("{:?}", loc);
-                    self.consume()?;
-                }
-                token => todo!("Handle: {:?}", token),
+                // TokenType::RightParen => {
+                //     eprintln!("{:?}", loc);
+                //     self.consume()?;
+                // }
+                token => todo!("Handle {:?} at {}", token, loc),
             };
         }
 

@@ -21,12 +21,24 @@ fn main() -> Result<()> {
     let content = read_to_string(&file_path)?;
 
     let mut lex = lexer::Lexer::new(file_path.to_string(), content);
-    let tokens = lex.tokenize()?;
+    let out = lex.tokenize();
+    if let Err(err) = out {
+        if let Some(msg) = err.into_inner() {
+            println!("{}", msg);
+        }
+        exit(1);
+    }
 
-    let mut pars = parser::Parser::new(tokens);
-    let parsed = pars.parse()?;
+    let mut pars = parser::Parser::new(out.unwrap());
+    let out = pars.parse();
+    if let Err(err) = out {
+        if let Some(msg) = err.into_inner() {
+            println!("{}", msg);
+        }
+        exit(1);
+    }
 
-    let mut inter = interpreter::Interpreter::new(parsed);
+    let mut inter = interpreter::Interpreter::new(out.unwrap());
     if let Err(err) = inter.interpret() {
         if let Some(msg) = err.into_inner() {
             println!("{}", msg);
