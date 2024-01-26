@@ -141,6 +141,7 @@ impl Lexer {
                 self.tokens
                     .push(Token(TokenType::Newline, TokenLocation(col + 1, line + 1)));
                 line += 1;
+                col = 0;
                 self.consume()?;
             } else if c.is_whitespace() {
                 self.consume()?;
@@ -208,7 +209,9 @@ impl Lexer {
                 self.consume()?;
             }
 
-            col += 1;
+            if c != '\n' {
+                col += 1;
+            }
         }
 
         Ok(self.tokens.to_vec())
