@@ -1,6 +1,6 @@
 use std::io::{Error, ErrorKind, Result};
 
-use crate::lexer::Token;
+use crate::lexer::{Token, TokenType};
 use crate::util::error;
 
 #[derive(Debug, Clone)]
@@ -73,19 +73,27 @@ impl Parser {
         let mut left: Expr;
         if self.peek(0).is_some() {
             let token = self.peek(0).unwrap().clone();
-            if let Token::FloatLiteral(val) = token {
+            let token_type = &token.0;
+            let loc = &token.1;
+            if let TokenType::FloatLiteral(val) = token_type {
                 left = Expr::FloatLiteral(val.to_string());
-            } else if let Token::Ident(name) = token {
-                if self.peek(1).is_some_and(|t| t == &Token::LeftParen) {
+            } else if let TokenType::Ident(name) = token_type {
+                if self
+                    .peek(1)
+                    .is_some_and(|Token(t, _)| t == &TokenType::LeftParen)
+                {
                     self.consume()?;
                     self.consume()?;
 
                     let mut args: Vec<Expr> = Vec::new();
 
-                    while self.peek(0).is_some_and(|t| t != &Token::RightParen) {
+                    while self
+                        .peek(0)
+                        .is_some_and(|Token(t, _)| t != &TokenType::RightParen)
+                    {
                         let arg = self.parse_expr(1, false)?;
                         args.push(arg);
-                        if self.peek(0).unwrap() == &Token::Comma {
+                        if &self.peek(0).unwrap().0 == &TokenType::Comma {
                             self.consume()?;
                         }
                     }
@@ -97,13 +105,13 @@ impl Parser {
                         left = Expr::Ident(name.to_string());
                     }
                 }
-            } else if let Token::Minus = token {
-                let Some(Token::FloatLiteral(val)) = self.peek(1) else {
-                    return Err(error!(InvalidData, "Missing literal!"));
+            } else if let TokenType::Minus = token_type {
+                let Some(Token(TokenType::FloatLiteral(val), _)) = self.peek(1) else {
+                    return Err(error!(InvalidData, "Missing literal at {}", loc));
                 };
                 left = Expr::NegFloatLiteral(val.to_string());
                 self.consume()?;
-            } else if let Token::LeftParen = token {
+            } else if let TokenType::LeftParen = token_type {
                 self.consume()?;
                 left = self.parse_expr(1, is_function)?;
             } else {
@@ -121,11 +129,11 @@ impl Parser {
                 break;
             }
 
-            let op = match cur.unwrap() {
-                &Token::Plus => Operator::Plus,
-                &Token::Minus => Operator::Minus,
-                &Token::Multi => Operator::Multi,
-                &Token::Div => Operator::Div,
+            let op = match &cur.unwrap().0 {
+                &TokenType::Plus => Operator::Plus,
+                &TokenType::Minus => Operator::Minus,
+                &TokenType::Multi => Operator::Multi,
+                &TokenType::Div => Operator::Div,
                 _ => return Ok(left),
             };
 
@@ -154,14 +162,23 @@ impl Parser {
         self.consume()?;
         let mut block: Vec<Parsed> = Vec::new();
 
-        while self.peek(0).is_some_and(|t| t != &Token::RightBrace) {
-            let t = self.peek(0).unwrap();
+        while self
+            .peek(0)
+            .is_some_and(|Token(t, _)| t != &TokenType::RightBrace)
+        {
+            let t = &self.peek(0).unwrap().0;
+            let loc = &self.peek(0).unwrap().1;
             match t {
-                Token::Ident(name) => {
-                    if self.peek(1).is_some_and(|t| t == &Token::Equals) {
+                TokenType::Ident(name) => {
+                    if self
+                        .peek(1)
+                        .is_some_and(|Token(t, _)| t == &TokenType::Equals)
+                    {
                         let out = self.parse_declaration(name.to_string())?;
                         block.push(out);
-                    } else if self.peek(1).is_some_and(|t| t == &Token::LeftParen)
+                    } else if self
+                        .peek(1)
+                        .is_some_and(|Token(t, _)| t == &TokenType::LeftParen)
                         && self.line_contains_equals()
                     {
                         let out = self.parse_function_declaration(name.to_string())?;
@@ -171,23 +188,24 @@ impl Parser {
                         block.push(out);
                     }
                 }
-                Token::Keyword(keyword) => {
+                TokenType::Keyword(keyword) => {
                     if keyword.as_str() != "from" {
-                        return Err(error!(Other, "Unexpected keyword: {}", keyword));
+                        return Err(error!(Other, "Unexpected keyword {:?} at {}", keyword, loc));
                     }
                     let out = self.parse_from_block()?;
                     block.push(out);
                 }
-                Token::FloatLiteral(_) => {
+                TokenType::FloatLiteral(_) => {
                     let out = self.parse_print()?;
                     block.push(out);
                 }
-                Token::Comment => {
-                    while self.peek(0).is_some() && self.peek(0).unwrap() != &Token::Newline {
+                TokenType::Comment => {
+                    while self.peek(0).is_some() && &self.peek(0).unwrap().0 != &TokenType::Newline
+                    {
                         self.consume()?;
                     }
                 }
-                Token::Newline => {
+                TokenType::Newline => {
                     self.consume()?;
                 }
                 token => todo!("Handle: {:?}", token),
@@ -206,12 +224,16 @@ impl Parser {
     }
 
     fn parse_function_declaration(&mut self, name: String) -> Result<Parsed> {
+        // println!("{:?}", &self.peek(0));
         let mut parameters: Vec<String> = Vec::new();
         self.consume()?;
         self.consume()?;
 
-        while self.peek(0).is_some_and(|t| t != &Token::RightParen) {
-            if let Token::Ident(name) = self.peek(0).unwrap() {
+        while self
+            .peek(0)
+            .is_some_and(|Token(t, _)| t != &TokenType::RightParen)
+        {
+            if let Token(TokenType::Ident(name), _) = self.peek(0).unwrap() {
                 parameters.push(name.to_string());
             }
             self.consume()?;
@@ -233,16 +255,16 @@ impl Parser {
     }
 
     fn line_contains_equals(&self) -> bool {
-        for i in 0.. {
+        for i in 0..self.tokens.len() - self.index - 1 {
             if !self.peek(i).is_some() {
                 return false;
             }
 
-            let t = self.peek(i).unwrap();
+            let t = &self.peek(i).unwrap().0;
 
-            if t == &Token::Newline {
+            if t == &TokenType::Newline {
                 return false;
-            } else if t == &Token::Equals {
+            } else if t == &TokenType::Equals {
                 return true;
             }
         }
@@ -251,14 +273,20 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Result<Vec<Parsed>> {
-        println!("Tokens: {:#?}", &self.tokens);
-        while let Some(cur) = self.peek(0) {
-            match &cur {
-                Token::Ident(name) => {
-                    if self.peek(1).is_some_and(|t| t == &Token::Equals) {
+        // println!("Tokens: {:?}", &self.tokens);
+        while let Some(Token(token_type, loc)) = self.peek(0) {
+            // println!("{:?}", cur);
+            match token_type {
+                TokenType::Ident(name) => {
+                    if self
+                        .peek(1)
+                        .is_some_and(|Token(t, _)| t == &TokenType::Equals)
+                    {
                         let out = self.parse_declaration(name.to_string())?;
                         self.parsed.push(out);
-                    } else if self.peek(1).is_some_and(|t| t == &Token::LeftParen)
+                    } else if self
+                        .peek(1)
+                        .is_some_and(|Token(t, _)| t == &TokenType::LeftParen)
                         && self.line_contains_equals()
                     {
                         let out = self.parse_function_declaration(name.to_string())?;
@@ -268,26 +296,27 @@ impl Parser {
                         self.parsed.push(out);
                     }
                 }
-                Token::Keyword(keyword) => {
+                TokenType::Keyword(keyword) => {
                     if keyword.as_str() != "from" {
                         return Err(error!(Other, "Unexpected keyword: {}", keyword));
                     }
                     let out = self.parse_from_block()?;
                     self.parsed.push(out);
                 }
-                Token::FloatLiteral(_) => {
+                TokenType::FloatLiteral(_) => {
                     let out = self.parse_print()?;
                     self.parsed.push(out);
                 }
-                Token::Comment => {
-                    while let Some(Token::Newline) = self.peek(0) {
+                TokenType::Comment => {
+                    while let Some(Token(TokenType::Newline, _)) = self.peek(0) {
                         self.consume()?;
                     }
                 }
-                Token::Newline => {
+                TokenType::Newline => {
                     self.consume()?;
                 }
-                Token::RightParen => {
+                TokenType::RightParen => {
+                    eprintln!("{:?}", loc);
                     self.consume()?;
                 }
                 token => todo!("Handle: {:?}", token),

@@ -1,8 +1,11 @@
 use crate::util::error;
-use std::io::{Error, ErrorKind, Result};
+use std::{
+    fmt::Display,
+    io::{Error, ErrorKind, Result},
+};
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Token {
+pub enum TokenType {
     Ident(String),
     FloatLiteral(String),
     Comment,
@@ -19,6 +22,26 @@ pub enum Token {
     Minus,
     Multi,
     Div,
+}
+
+#[derive(Debug, Clone)]
+pub struct Token(pub TokenType, pub TokenLocation);
+
+impl Token {
+    pub fn is_token_type(&self, token_type: TokenType) -> bool {
+        self.0 == token_type
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TokenLocation(pub u32, pub u32);
+
+impl Display for TokenLocation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.1, self.0)?;
+
+        Ok(())
+    }
 }
 
 pub struct Lexer {
@@ -54,7 +77,7 @@ impl Lexer {
         Ok(cur)
     }
 
-    fn parse_text(&mut self) -> Result<()> {
+    fn parse_text(&mut self, col: u32, row: u32) -> Result<()> {
         let mut buf = String::new();
         buf.push(self.consume()?);
 
@@ -63,14 +86,18 @@ impl Lexer {
         }
 
         match buf.as_str() {
-            "from" | "to" | "as" => self.tokens.push(Token::Keyword(buf)),
-            _ => self.tokens.push(Token::Ident(buf)),
+            "from" | "to" | "as" => self
+                .tokens
+                .push(Token(TokenType::Keyword(buf), TokenLocation(col, row))),
+            _ => self
+                .tokens
+                .push(Token(TokenType::Ident(buf), TokenLocation(col, row))),
         }
 
         Ok(())
     }
 
-    fn parse_float(&mut self) -> Result<()> {
+    fn parse_float(&mut self, row: u32, col: u32) -> Result<()> {
         let mut buf = String::new();
         let mut period = false;
 
@@ -105,60 +132,89 @@ impl Lexer {
             buf.push_str(".0");
         }
 
-        self.tokens.push(Token::FloatLiteral(buf));
+        self.tokens
+            .push(Token(TokenType::FloatLiteral(buf), TokenLocation(col, row)));
 
         Ok(())
     }
 
     pub fn tokenize(&mut self) -> Result<Vec<Token>> {
+        let mut col = 0u32;
+        let mut line = 0u32;
         while self.peek(0).is_some() {
             let c = self.peek(0).unwrap();
             if c == '\n' {
-                self.tokens.push(Token::Newline);
+                self.tokens
+                    .push(Token(TokenType::Newline, TokenLocation(col + 1, line + 1)));
+                line += 1;
                 self.consume()?;
             } else if c.is_whitespace() {
                 self.consume()?;
             } else if c.is_ascii_alphabetic() {
-                self.parse_text()?;
+                self.parse_text(col + 1, line + 1)?;
             } else if c == '.' || c.is_digit(10) {
-                self.parse_float()?;
+                self.parse_float(col + 1, line + 1)?;
             } else if c == '=' {
-                self.tokens.push(Token::Equals);
+                self.tokens
+                    .push(Token(TokenType::Equals, TokenLocation(col + 1, line + 1)));
                 self.consume()?;
             } else if c == '+' {
-                self.tokens.push(Token::Plus);
+                self.tokens
+                    .push(Token(TokenType::Plus, TokenLocation(col + 1, line + 1)));
                 self.consume()?;
             } else if c == '-' {
-                self.tokens.push(Token::Minus);
+                self.tokens
+                    .push(Token(TokenType::Minus, TokenLocation(col + 1, line + 1)));
                 self.consume()?;
             } else if c == '*' {
-                self.tokens.push(Token::Multi);
+                self.tokens
+                    .push(Token(TokenType::Multi, TokenLocation(col + 1, line + 1)));
                 self.consume()?;
             } else if c == ',' {
-                self.tokens.push(Token::Comma);
+                self.tokens
+                    .push(Token(TokenType::Comment, TokenLocation(col + 1, line + 1)));
                 self.consume()?;
             } else if c == '/' {
-                self.tokens.push(Token::Div);
+                self.tokens
+                    .push(Token(TokenType::Div, TokenLocation(col + 1, line + 1)));
                 self.consume()?;
             } else if c == '#' {
-                self.tokens.push(Token::Comment);
+                self.tokens
+                    .push(Token(TokenType::Comment, TokenLocation(col + 1, line + 1)));
                 self.consume()?;
             } else if c == '(' {
-                self.tokens.push(Token::LeftParen);
+                self.tokens.push(Token(
+                    TokenType::LeftParen,
+                    TokenLocation(col + 1, line + 1),
+                ));
                 self.consume()?;
             } else if c == ')' {
-                self.tokens.push(Token::RightParen);
+                self.tokens.push(Token(
+                    TokenType::RightParen,
+                    TokenLocation(col + 1, line + 1),
+                ));
                 self.consume()?;
             } else if c == '{' {
-                self.tokens.push(Token::LeftBrace);
+                self.tokens.push(Token(
+                    TokenType::LeftBrace,
+                    TokenLocation(col + 1, line + 1),
+                ));
                 self.consume()?;
             } else if c == '}' {
-                self.tokens.push(Token::RightBrace);
+                self.tokens.push(Token(
+                    TokenType::RightBrace,
+                    TokenLocation(col + 1, line + 1),
+                ));
                 self.consume()?;
             } else {
-                self.tokens.push(Token::Unknown(c));
+                self.tokens.push(Token(
+                    TokenType::Unknown(c),
+                    TokenLocation(col + 1, line + 1),
+                ));
                 self.consume()?;
             }
+
+            col += 1;
         }
 
         Ok(self.tokens.to_vec())
