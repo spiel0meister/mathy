@@ -25,10 +25,11 @@ pub enum TokenType {
 }
 
 #[derive(Debug, Clone)]
-pub struct Token(pub TokenType, pub TokenLocation);
+/// The location of a [`Token`] in form (column, row).
+pub struct TokenLocation(pub u32, pub u32);
 
 #[derive(Debug, Clone)]
-pub struct TokenLocation(pub u32, pub u32);
+pub struct Token(pub TokenType, pub TokenLocation);
 
 impl Display for TokenLocation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
