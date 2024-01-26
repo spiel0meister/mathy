@@ -32,11 +32,18 @@ from 0 to 10 as x {
 }
 ```
 
+You can also use a custom step (defaults to 1.0):
+```mth
+from 0 to 10 as x with step 2 {
+    # Stuff...
+}
+```
+
 4. Print expressions:
 ```mth
 f(x) = x * 2 - 2
 from 0 to 10 as x {
-    f(x) # The result will be printed out!
+    f(x) # The result will be printed out! btw this is a comment, this will be ignored
 }
 ```
 
