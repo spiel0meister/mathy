@@ -126,6 +126,9 @@ impl Interpreter {
             let parsed = block.get(current).unwrap().clone();
             match parsed {
                 Parsed::Declaration(name, expr) => {
+                    if let Some(_) = self.variables.get(&name) {
+                        return Err(error!(Other, "Re-decleration of variable {:?}", name));
+                    }
                     self.variables.insert(name.to_string(), expr.clone());
                     scope.push(name.to_string());
                 }
@@ -134,6 +137,9 @@ impl Interpreter {
                     println!("{}", value);
                 }
                 Parsed::FunctionDecleration(f, parameters, expr) => {
+                    if let Some(_) = self.functions.get(&f) {
+                        return Err(error!(Other, "Re-decleration of function {:?}", f));
+                    }
                     self.functions
                         .insert(f.to_string(), (parameters.to_vec(), expr.clone()));
                     scope.push(f.to_string());

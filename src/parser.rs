@@ -73,16 +73,16 @@ impl Parser {
         let mut left: Expr;
         if self.peek(0).is_some() {
             let token = self.peek(0).unwrap().clone();
-            if let Token::FloatLiteral(val) = &token {
+            if let Token::FloatLiteral(val) = token {
                 left = Expr::FloatLiteral(val.to_string());
-            } else if let Token::Ident(name) = &token {
+            } else if let Token::Ident(name) = token {
                 if self.peek(1).is_some_and(|t| t == &Token::LeftParen) {
                     self.consume()?;
                     self.consume()?;
 
                     let mut args: Vec<Expr> = Vec::new();
 
-                    while self.peek(0).is_some_and(|t| t == &Token::RightParen) {
+                    while self.peek(0).is_some_and(|t| t != &Token::RightParen) {
                         let arg = self.parse_expr(1, false)?;
                         args.push(arg);
                         if self.peek(0).unwrap() == &Token::Comma {
@@ -97,13 +97,13 @@ impl Parser {
                         left = Expr::Ident(name.to_string());
                     }
                 }
-            } else if let Token::Minus = &token {
+            } else if let Token::Minus = token {
                 let Some(Token::FloatLiteral(val)) = self.peek(1) else {
                     return Err(error!(InvalidData, "Missing literal!"));
                 };
                 left = Expr::NegFloatLiteral(val.to_string());
                 self.consume()?;
-            } else if let Token::LeftParen = &token {
+            } else if let Token::LeftParen = token {
                 self.consume()?;
                 left = self.parse_expr(1, is_function)?;
             } else {
@@ -210,7 +210,7 @@ impl Parser {
         self.consume()?;
         self.consume()?;
 
-        while self.peek(0).is_some_and(|t| t == &Token::RightParen) {
+        while self.peek(0).is_some_and(|t| t != &Token::RightParen) {
             if let Token::Ident(name) = self.peek(0).unwrap() {
                 parameters.push(name.to_string());
             }
@@ -251,6 +251,7 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Result<Vec<Parsed>> {
+        println!("Tokens: {:#?}", &self.tokens);
         while let Some(cur) = self.peek(0) {
             match &cur {
                 Token::Ident(name) => {
@@ -284,6 +285,9 @@ impl Parser {
                     }
                 }
                 Token::Newline => {
+                    self.consume()?;
+                }
+                Token::RightParen => {
                     self.consume()?;
                 }
                 token => todo!("Handle: {:?}", token),
