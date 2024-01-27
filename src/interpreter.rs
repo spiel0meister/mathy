@@ -2,6 +2,7 @@ use crate::lexer::{Token, TokenType};
 use crate::parser::{Expr, Operator, Parsed};
 use crate::util::error;
 
+use std::f64::consts::PI;
 use std::{
     collections::HashMap,
     io::{Error, ErrorKind, Result},
@@ -24,6 +25,15 @@ impl Interpreter {
         }
     }
 
+    fn get_variable(&self, name: &str) -> Option<f64> {
+        match name {
+            "PI" => Some(PI),
+            "TAU" => Some(PI * 2.0),
+            "GLR" => Some(1.618_033_988_749_894f64), // Golden ratio
+            _ => self.variables.get(name).copied(),
+        }
+    }
+
     fn transform_fn_expr(
         &self,
         (parameters, args): (Vec<String>, Vec<Expr>),
@@ -40,18 +50,21 @@ impl Interpreter {
                         return Ok(out);
                     }
                 }
-                if let Some(value) = self.variables.get(name) {
+                if let Some(value) = self.get_variable(name) {
                     return Ok(Expr::FloatLiteral(value.to_string()));
                 }
                 return Err(error!(Other, "Undefiend variable: {:?}", name));
             }
-            Expr::FunctionCall(name, args) => {
-                if let Some((parameters, expr2)) = self.functions.get(name) {
-                    out = self.transform_fn_expr((parameters.to_vec(), args.to_vec()), expr2)?;
-                } else {
-                    return Err(error!(Other, "Undefined function: {:?}", name));
+            Expr::FunctionCall(name, args) => match name {
+                _ => {
+                    if let Some((parameters, expr2)) = self.functions.get(name) {
+                        out =
+                            self.transform_fn_expr((parameters.to_vec(), args.to_vec()), expr2)?;
+                    } else {
+                        return Err(error!(Other, "Undefined function: {:?}", name));
+                    }
                 }
-            }
+            },
             Expr::Expr(left, op, right) => {
                 let left_ =
                     self.transform_fn_expr((parameters.to_vec(), args.to_vec()), left.as_ref())?;
@@ -68,7 +81,7 @@ impl Interpreter {
     fn evaluate_expr(&self, expr: &Expr) -> Result<f64> {
         match expr {
             Expr::Ident(name) => {
-                if let Some(value) = self.variables.get(name) {
+                if let Some(value) = self.get_variable(name) {
                     Ok(value.clone())
                 } else {
                     return Err(error!(Other, "Undefined variable: {:?}", name));
@@ -93,19 +106,42 @@ impl Interpreter {
                     .map_err(|err| error!(InvalidInput, "{}", err))?;
                 Ok(-1.0 * value_f64)
             }
-            Expr::FunctionCall(name, args) => {
-                let Some((parameters, expr)) = self.functions.get(name) else {
-                    return Err(error!(Other, "Undefined function: {:?}", name));
-                };
-
-                if args.len() != parameters.len() {
-                    return Err(error!(Other, "Parameters incorrect!"));
+            Expr::FunctionCall(name, args) => match name.as_str() {
+                "sin" => {
+                    if args.len() > 1 {
+                        return Err(error!(Other, "Too many arguments for sin!"));
+                    }
+                    let arg = self.evaluate_expr(&args[0])?;
+                    Ok(arg.sin())
                 }
+                "cos" => {
+                    if args.len() > 1 {
+                        return Err(error!(Other, "Too many arguments for cos!"));
+                    }
+                    let arg = self.evaluate_expr(&args[0])?;
+                    Ok(arg.cos())
+                }
+                "tan" => {
+                    if args.len() > 1 {
+                        return Err(error!(Other, "Too many arguments for tan!"));
+                    }
+                    let arg = self.evaluate_expr(&args[0])?;
+                    Ok(arg.tan())
+                }
+                _ => {
+                    let Some((parameters, expr)) = self.functions.get(name) else {
+                        return Err(error!(Other, "Undefined function: {:?}", name));
+                    };
 
-                let parsable =
-                    self.transform_fn_expr((parameters.to_vec(), args.to_vec()), expr)?;
-                return Ok(self.evaluate_expr(&parsable)?);
-            }
+                    if args.len() != parameters.len() {
+                        return Err(error!(Other, "Parameters incorrect!"));
+                    }
+
+                    let parsable =
+                        self.transform_fn_expr((parameters.to_vec(), args.to_vec()), expr)?;
+                    return Ok(self.evaluate_expr(&parsable)?);
+                }
+            },
             _ => unreachable!(),
         }
     }
@@ -119,6 +155,13 @@ impl Interpreter {
         Ok(())
     }
 
+    fn function_exits(&self, name: &str) -> bool {
+        match name {
+            "sin" | "cos" | "tan" => true,
+            _ => self.functions.get(name).is_some(),
+        }
+    }
+
     fn execute_block(&mut self, block: Vec<Parsed>) -> Result<Scope> {
         let mut current = 0usize;
         let mut scope: Scope = Vec::new();
@@ -126,7 +169,7 @@ impl Interpreter {
             let parsed = block.get(current).unwrap().clone();
             match parsed {
                 Parsed::Declaration(Token(TokenType::Ident(name), loc), expr) => {
-                    if let Some(_) = self.variables.get(&name) {
+                    if let Some(_) = self.get_variable(&name) {
                         return Err(error!(
                             Other,
                             "Re-decleration of variable {:?} at {}", name, loc
@@ -141,7 +184,7 @@ impl Interpreter {
                     println!("{}", value);
                 }
                 Parsed::FunctionDecleration(Token(TokenType::Ident(f), loc), parameters, expr) => {
-                    if let Some(_) = self.functions.get(&f) {
+                    if self.function_exits(&f) {
                         return Err(error!(
                             Other,
                             "Re-decleration of function {:?} at {}", f, loc

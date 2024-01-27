@@ -49,6 +49,6 @@ from 0 to 10 as x {
 
 ## Todo
 
-- [ ] Built-in functions (sin, cos, tan, ...)
-- [ ] Constants (PI, TAU, GOLDEN RATIO, ...)
+- [x] Built-in functions (sin, cos, tan, ...)
+- [x] Constants (PI, TAU, GOLDEN RATIO, ...)
 - [ ] C-like macros to config interpretation (e.g. set angle mode to degrees, radian, or grad, ...)
