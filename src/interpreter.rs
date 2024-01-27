@@ -11,7 +11,7 @@ type Scope = Vec<String>;
 
 pub struct Interpreter {
     parsed: Vec<Parsed>,
-    variables: HashMap<String, Expr>,
+    variables: HashMap<String, f64>,
     functions: HashMap<String, (Vec<String>, Expr)>,
 }
 
@@ -40,9 +40,8 @@ impl Interpreter {
                         return Ok(out);
                     }
                 }
-                if let Some(expr) = self.variables.get(name) {
-                    out = expr.clone();
-                    return Ok(out);
+                if let Some(value) = self.variables.get(name) {
+                    return Ok(Expr::FloatLiteral(value.to_string()));
                 }
                 return Err(error!(Other, "Undefiend variable: {:?}", name));
             }
@@ -69,8 +68,8 @@ impl Interpreter {
     fn evaluate_expr(&self, expr: &Expr) -> Result<f64> {
         match expr {
             Expr::Ident(name) => {
-                if let Some(expr2) = self.variables.get(name) {
-                    self.evaluate_expr(expr2)
+                if let Some(value) = self.variables.get(name) {
+                    Ok(value.clone())
                 } else {
                     return Err(error!(Other, "Undefined variable: {:?}", name));
                 }
@@ -133,7 +132,8 @@ impl Interpreter {
                             "Re-decleration of variable {:?} at {}", name, loc
                         ));
                     }
-                    self.variables.insert(name.to_string(), expr.clone());
+                    self.variables
+                        .insert(name.to_string(), self.evaluate_expr(&expr)?);
                     scope.push(name.to_string());
                 }
                 Parsed::PrintExpr(expr) => {
@@ -169,13 +169,12 @@ impl Interpreter {
                         return Err(error!(Other, "Internal error!"));
                     };
                     let mut i = min;
-                    self.variables
-                        .insert(name.to_string(), Expr::FloatLiteral(min.to_string()));
+                    self.variables.insert(name.to_string(), i);
                     while i <= max {
                         let scope = self.execute_block(block.to_vec())?;
                         self.clean_scope(scope)?;
                         i += step;
-                        *self.variables.get_mut(&name).unwrap() = Expr::FloatLiteral(i.to_string());
+                        *self.variables.get_mut(&name).unwrap() = i;
                     }
                     self.variables.remove(&name);
                 }
