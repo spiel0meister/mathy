@@ -5,10 +5,7 @@ use std::{
     process::exit,
 };
 
-mod interpreter;
-mod lexer;
-mod parser;
-mod util;
+use mathy::*;
 
 fn main() -> Result<()> {
     let args_: Vec<String> = args().collect();
