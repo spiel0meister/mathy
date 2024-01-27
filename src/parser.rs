@@ -195,6 +195,7 @@ impl Parser {
                 };
             }
         }
+        self.consume()?;
 
         let mut block: Vec<Parsed> = Vec::new();
 

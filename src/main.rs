@@ -5,7 +5,7 @@ use std::{
     process::exit,
 };
 
-use mathy::*;
+use mathy::{interpreter::Interpreter, lexer::Lexer, parser::Parser, util::error};
 
 fn main() -> Result<()> {
     let args_: Vec<String> = args().collect();
@@ -17,28 +17,28 @@ fn main() -> Result<()> {
     let file_path = &args_[1];
     let content = read_to_string(&file_path)?;
 
-    let mut lex = lexer::Lexer::new(file_path.to_string(), content);
-    let out = lex.tokenize();
+    let mut lexer = Lexer::new(file_path.to_string(), content);
+    let out = lexer.tokenize();
     if let Err(err) = out {
         if let Some(msg) = err.into_inner() {
-            println!("{}", msg);
+            eprintln!("{}", msg);
         }
         exit(1);
     }
 
-    let mut pars = parser::Parser::new(out.unwrap());
-    let out = pars.parse();
+    let mut parser = Parser::new(out.unwrap());
+    let out = parser.parse();
     if let Err(err) = out {
         if let Some(msg) = err.into_inner() {
-            println!("{}", msg);
+            eprintln!("{}", msg);
         }
         exit(1);
     }
 
-    let mut inter = interpreter::Interpreter::new(out.unwrap());
-    if let Err(err) = inter.interpret() {
+    let mut interpreter = Interpreter::new(out.unwrap());
+    if let Err(err) = interpreter.interpret() {
         if let Some(msg) = err.into_inner() {
-            println!("{}", msg);
+            eprintln!("{}", msg);
         }
         exit(1);
     }
