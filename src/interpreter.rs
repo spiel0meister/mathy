@@ -221,7 +221,10 @@ impl Interpreter {
                     }
                     self.variables.remove(&name);
                 }
-
+                Parsed::Block(block) => {
+                    let scope = self.execute_block(block)?;
+                    self.clean_scope(scope)?;
+                }
                 _ => unreachable!("Internal error!"),
             }
             current += 1;

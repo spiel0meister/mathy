@@ -25,6 +25,7 @@ pub enum Expr {
 pub enum Parsed {
     FunctionDecleration(Token, Vec<Token>, Expr),
     FromLoop(Expr, Expr, Expr, Expr, Vec<Parsed>),
+    Block(Vec<Parsed>),
     Declaration(Token, Expr),
     PrintExpr(Expr),
 }
@@ -157,48 +158,9 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_from_block(&mut self) -> Result<Parsed> {
-        self.consume()?;
-        let min = self.parse_expr(1, false)?;
-        self.consume()?;
-        let max = self.parse_expr(1, false)?;
-        self.consume()?;
-        let ident = self.parse_expr(1, false)?;
-        let mut step: Expr = Expr::FloatLiteral("1.0".to_string());
-        let Some(t) = self.peek(0) else {
-            return Err(error!(UnexpectedEof, "EOF"));
-        };
-        let t = t.clone();
-        if let Token(TokenType::Keyword(keyword), loc) = t {
-            if keyword.as_str() == "with" {
-                self.consume()?;
-                let t = self.consume()?;
-                if let Token(TokenType::Keyword(keyword), loc) = t {
-                    if keyword.as_str() == "step" {
-                        step = self.parse_expr(1, false)?;
-                        self.consume()?;
-                    } else {
-                        return Err(error!(
-                            Other,
-                            "Expected \"step\" keyword, got {:?} keyword at {}",
-                            keyword.clone(),
-                            loc
-                        ));
-                    }
-                } else {
-                    return Err(error!(
-                        Other,
-                        "Expected \"step\" keyword, got {} at {}",
-                        t.clone().exclude_loc(),
-                        loc
-                    ));
-                };
-            }
-        }
-        self.consume()?;
-
+    fn parse_block(&mut self) -> Result<Vec<Parsed>> {
         let mut block: Vec<Parsed> = Vec::new();
-
+        self.consume()?;
         while self
             .peek(0)
             .is_some_and(|Token(t, _)| t != &TokenType::RightBrace)
@@ -249,6 +211,51 @@ impl Parser {
             }
         }
         self.consume()?;
+
+        Ok(block)
+    }
+
+    fn parse_from_block(&mut self) -> Result<Parsed> {
+        self.consume()?;
+        let min = self.parse_expr(1, false)?;
+        self.consume()?;
+        let max = self.parse_expr(1, false)?;
+        self.consume()?;
+        let ident = self.parse_expr(1, false)?;
+        let mut step: Expr = Expr::FloatLiteral("1.0".to_string());
+        let Some(t) = self.peek(0) else {
+            return Err(error!(UnexpectedEof, "EOF"));
+        };
+        let t = t.clone();
+        if let Token(TokenType::Keyword(keyword), loc) = t {
+            if keyword.as_str() == "with" {
+                self.consume()?;
+                let t = self.consume()?;
+                if let Token(TokenType::Keyword(keyword), loc) = t {
+                    if keyword.as_str() == "step" {
+                        step = self.parse_expr(1, false)?;
+                        self.consume()?;
+                    } else {
+                        return Err(error!(
+                            Other,
+                            "Expected \"step\" keyword, got {:?} keyword at {}",
+                            keyword.clone(),
+                            loc
+                        ));
+                    }
+                } else {
+                    return Err(error!(
+                        Other,
+                        "Expected \"step\" keyword, got {} at {}",
+                        t.clone().exclude_loc(),
+                        loc
+                    ));
+                };
+            }
+        }
+        self.consume()?;
+
+        let block: Vec<Parsed> = self.parse_block()?;
 
         Ok(Parsed::FromLoop(min, max, ident, step, block))
     }
@@ -350,6 +357,10 @@ impl Parser {
                 }
                 TokenType::Newline => {
                     self.consume()?;
+                }
+                TokenType::LeftBrace => {
+                    let block = self.parse_block()?;
+                    self.parsed.push(Parsed::Block(block));
                 }
                 // TokenType::RightParen => {
                 //     eprintln!("{:?}", loc);
