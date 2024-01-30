@@ -32,7 +32,7 @@ impl Display for Data {
                 }
                 buf.push(']');
 
-                writeln!(f, "{}", buf)?;
+                write!(f, "{}", buf)?;
             }
         };
 
@@ -352,7 +352,7 @@ impl Interpreter {
                     };
                     let mut i = min;
                     self.variables.insert(name.to_string(), Data::Float(i));
-                    while i < max {
+                    while i <= max {
                         let scope = self.execute_block(block.to_vec())?;
                         self.clean_scope(scope)?;
                         i += step;
