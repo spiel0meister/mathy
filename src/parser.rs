@@ -41,6 +41,7 @@ pub enum Parsed {
     ForLoop(Expr, Expr, Vec<Parsed>),
     Block(Vec<Parsed>),
     Declaration(Token, Expr),
+    Destructuring(Expr, Expr),
     PrintExpr(Expr),
 }
 
@@ -343,6 +344,7 @@ impl Parser {
 
     fn parse_print(&mut self) -> Result<Parsed> {
         let expr = self.parse_expr(1, false)?;
+        println!("{:?}", expr);
 
         Ok(Parsed::PrintExpr(expr))
     }
@@ -399,6 +401,17 @@ impl Parser {
                     }
                     _ => return Err(error!(Other, "Unexpected keyword {} at {}", keyword, loc)),
                 },
+                TokenType::LeftBracket => {
+                    if self.line_contains_equals() {
+                        let left = self.parse_expr(1, false)?;
+                        self.consume()?;
+                        let right = self.parse_expr(1, false)?;
+                        self.parsed.push(Parsed::Destructuring(left, right));
+                    } else {
+                        let out = self.parse_print()?;
+                        self.parsed.push(out);
+                    }
+                }
                 TokenType::FloatLiteral(_) | TokenType::LeftParen => {
                     let out = self.parse_print()?;
                     self.parsed.push(out);

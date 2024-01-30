@@ -287,6 +287,7 @@ impl Interpreter {
     }
 
     fn execute_block(&mut self, block: Vec<Parsed>) -> Result<Scope> {
+        println!("Block: {:#?}", block);
         let mut current = 0usize;
         let mut scope: Scope = Vec::new();
         while block.get(current).is_some() {
@@ -381,6 +382,29 @@ impl Interpreter {
                     }
                     self.variables.remove(&name);
                 }
+                Parsed::Destructuring(left, right) => {
+                    let Expr::List(left_exprs) = left else {
+                        return Err(error!(Other, "Some error!"));
+                    };
+                    let Expr::List(right_exprs) = right else {
+                        return Err(error!(Other, "Some error!"));
+                    };
+                    if left_exprs.len() != right_exprs.len() {
+                        return Err(error!(Other, "Too few idents in destructor!"));
+                    }
+                    for (left, right) in left_exprs.iter().zip(right_exprs) {
+                        let Expr::Ident(name) = left else {
+                            return Err(error!(Other, "Only idents allowed in destructor!"));
+                        };
+
+                        let None = self.variables.get(name) else {
+                            return Err(error!(Other, "Re-decleration of variable {:?}", name));
+                        };
+
+                        let data = self.evaluate_expr(&right)?;
+                        self.variables.insert(name.clone(), data);
+                    }
+                }
                 _ => return Err(error!(Other, "Some error!")),
             }
             current += 1;
@@ -390,6 +414,7 @@ impl Interpreter {
     }
 
     pub fn interpret(&mut self) -> Result<()> {
+        // println!("{:?}", &self.parsed);
         let scope = self.execute_block(self.parsed.clone())?;
         self.clean_scope(scope)?;
 
