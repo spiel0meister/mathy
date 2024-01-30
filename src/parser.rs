@@ -1,6 +1,6 @@
 use std::io::{Error, ErrorKind, Result};
 
-use crate::lexer::{Token, TokenLocation, TokenType};
+use crate::lexer::{Token, TokenType};
 use crate::util::error;
 
 #[derive(Debug, Clone)]
@@ -399,7 +399,7 @@ impl Parser {
                     }
                     _ => return Err(error!(Other, "Unexpected keyword {} at {}", keyword, loc)),
                 },
-                TokenType::FloatLiteral(_) => {
+                TokenType::FloatLiteral(_) | TokenType::LeftParen => {
                     let out = self.parse_print()?;
                     self.parsed.push(out);
                 }
