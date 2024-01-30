@@ -17,9 +17,9 @@ pub enum Expr {
     FloatLiteral(String),
     NegFloatLiteral(String),
     Ident(String),
-    Parameter(String),
     FunctionCall(String, Vec<Expr>),
     Expr(Box<Expr>, Operator, Box<Expr>),
+    List(Vec<Expr>),
 }
 
 impl From<f64> for Expr {
@@ -114,11 +114,7 @@ impl Parser {
                     }
                     left = Expr::FunctionCall(name.to_string(), args);
                 } else {
-                    if is_function {
-                        left = Expr::Parameter(name.to_string());
-                    } else {
-                        left = Expr::Ident(name.to_string());
-                    }
+                    left = Expr::Ident(name.to_string());
                 }
             } else if let TokenType::Minus = token_type {
                 let Some(Token(TokenType::FloatLiteral(val), _)) = self.peek(1) else {
@@ -129,6 +125,22 @@ impl Parser {
             } else if let TokenType::LeftParen = token_type {
                 self.consume()?;
                 left = self.parse_expr(1, is_function)?;
+            } else if let TokenType::LeftBracket = token_type {
+                self.consume()?;
+                let mut out: Vec<Expr> = Vec::new();
+
+                while self
+                    .peek(0)
+                    .is_some_and(|Token(t, _)| t != &TokenType::RightBracket)
+                {
+                    if self.peek(0).unwrap().0 == TokenType::Comma {
+                        self.consume()?;
+                    }
+                    out.push(self.parse_expr(1, is_function)?);
+                }
+                self.consume()?;
+
+                left = Expr::List(out);
             } else {
                 return Err(error!(
                     InvalidData,

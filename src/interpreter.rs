@@ -12,12 +12,26 @@ use std::{
 #[derive(Debug, Clone, PartialEq)]
 pub enum Data {
     Float(f64),
+    List(Vec<Data>),
 }
 
 impl Display for Data {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Float(value) => writeln!(f, "{}", value)?,
+            Self::List(datas) => {
+                let mut buf = String::from("[");
+                for data in datas {
+                    match data {
+                        Data::Float(value) => buf.push_str(value.to_string().as_str()),
+                        Data::List(_) => buf.push_str(data.to_string().as_str()),
+                    };
+                    buf.push_str(", ");
+                }
+                buf.push(']');
+
+                writeln!(f, "{}", buf)?;
+            }
         };
 
         Ok(())
@@ -35,9 +49,11 @@ pub struct Interpreter {
 fn apply_op(left: Data, right: Data, op: Operator) -> Result<Data> {
     let left_val = match left {
         Data::Float(value1) => value1,
+        Data::List(_) => return Err(error!(Other, "Operators unsupported on lists.")),
     };
     let right_val = match right {
         Data::Float(value1) => value1,
+        Data::List(_) => return Err(error!(Other, "Operators unsupported on lists.")),
     };
 
     Ok(match op {
@@ -81,8 +97,7 @@ impl Interpreter {
         let out: Expr;
 
         match expr {
-            Expr::Ident(_) => out = expr.clone(),
-            Expr::Parameter(name) => {
+            Expr::Ident(name) => {
                 for (name_, value) in parameters.iter().zip(args) {
                     if name == name_ {
                         out = value.clone();
@@ -92,6 +107,7 @@ impl Interpreter {
                 if let Some(data) = self.get_variable(name) {
                     match data {
                         Data::Float(value) => return Ok(Expr::from(value)),
+                        Data::List(values) => return Err(error!(Other, "???")),
                     };
                 }
                 return Err(error!(Other, "Undefiend variable: {:?}", name));
@@ -113,6 +129,7 @@ impl Interpreter {
                     self.transform_fn_expr((parameters.to_vec(), args.to_vec()), right.as_ref())?;
                 out = Expr::Expr(Box::new(left_), op.clone(), Box::new(right_));
             }
+            Expr::List(_) => todo!(),
             Expr::FloatLiteral(_) | Expr::NegFloatLiteral(_) => out = expr.clone(),
         };
 
@@ -152,6 +169,7 @@ impl Interpreter {
                     let arg = self.evaluate_expr(&args[0])?;
                     match arg {
                         Data::Float(value) => Ok(Data::Float(value.sin())),
+                        Data::List(values) => return Err(error!(Other, "???")),
                     }
                 }
                 "cos" => {
@@ -161,6 +179,7 @@ impl Interpreter {
                     let arg = self.evaluate_expr(&args[0])?;
                     match arg {
                         Data::Float(value) => Ok(Data::Float(value.cos())),
+                        Data::List(values) => return Err(error!(Other, "???")),
                     }
                 }
                 "tan" => {
@@ -170,6 +189,7 @@ impl Interpreter {
                     let arg = self.evaluate_expr(&args[0])?;
                     match arg {
                         Data::Float(value) => Ok(Data::Float(value.tan())),
+                        Data::List(values) => return Err(error!(Other, "???")),
                     }
                 }
                 _ => {
@@ -186,6 +206,17 @@ impl Interpreter {
                     return Ok(self.evaluate_expr(&parsable)?);
                 }
             },
+            Expr::List(exprs) => {
+                let vals = exprs
+                    .iter()
+                    .map(|expr| {
+                        self.evaluate_expr(expr)
+                            .unwrap_or_else(|err| panic!("{:?}", err))
+                    })
+                    .collect();
+
+                Ok(Data::List(vals))
+            }
             _ => unreachable!(),
         }
     }
@@ -251,12 +282,15 @@ impl Interpreter {
                 Parsed::FromLoop(min_expr, max_expr, ident_expr, step_expr, block) => {
                     let min = match self.evaluate_expr(&min_expr)? {
                         Data::Float(value) => value,
+                        Data::List(values) => return Err(error!(Other, "???")),
                     };
                     let max = match self.evaluate_expr(&max_expr)? {
                         Data::Float(value) => value,
+                        Data::List(values) => return Err(error!(Other, "???")),
                     };
                     let step = match self.evaluate_expr(&step_expr)? {
                         Data::Float(value) => value,
+                        Data::List(values) => return Err(error!(Other, "???")),
                     };
                     let Expr::Ident(name) = ident_expr else {
                         return Err(error!(Other, "Internal error!"));

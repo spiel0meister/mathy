@@ -16,6 +16,8 @@ pub enum TokenType {
     RightParen,
     LeftBrace,
     RightBrace,
+    LeftBracket,
+    RightBracket,
     Keyword(String),
     Comma,
     Plus,
@@ -35,6 +37,7 @@ impl Display for TokenType {
             Self::Comma => ",",
             Self::LeftParen => "(",
             Self::LeftBrace => "{",
+            Self::LeftBracket => "[",
             Self::Equals => "=",
             Self::Comment => "#",
             Self::Newline => "\\n",
@@ -43,6 +46,7 @@ impl Display for TokenType {
             Self::Keyword(keyword) => keyword,
             Self::RightParen => ")",
             Self::RightBrace => "}",
+            Self::RightBracket => "]",
             Self::Circumflex => "^",
             Self::Unknown(c) => {
                 return write!(f, "{:?}", c);
@@ -222,7 +226,7 @@ impl Lexer {
                 self.consume()?;
             } else if c == ',' {
                 self.tokens.push(Token(
-                    TokenType::Comment,
+                    TokenType::Comma,
                     TokenLocation(self.file_path.clone(), col + 1, line + 1),
                 ));
                 self.consume()?;
@@ -259,6 +263,18 @@ impl Lexer {
             } else if c == '}' {
                 self.tokens.push(Token(
                     TokenType::RightBrace,
+                    TokenLocation(self.file_path.clone(), col + 1, line + 1),
+                ));
+                self.consume()?;
+            } else if c == '[' {
+                self.tokens.push(Token(
+                    TokenType::LeftBracket,
+                    TokenLocation(self.file_path.clone(), col + 1, line + 1),
+                ));
+                self.consume()?;
+            } else if c == ']' {
+                self.tokens.push(Token(
+                    TokenType::RightBracket,
                     TokenLocation(self.file_path.clone(), col + 1, line + 1),
                 ));
                 self.consume()?;
