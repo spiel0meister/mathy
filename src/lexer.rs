@@ -22,6 +22,7 @@ pub enum TokenType {
     Minus,
     Multi,
     Div,
+    Circumflex,
 }
 
 impl Display for TokenType {
@@ -42,6 +43,7 @@ impl Display for TokenType {
             Self::Keyword(keyword) => keyword,
             Self::RightParen => ")",
             Self::RightBrace => "}",
+            Self::Circumflex => "^",
             Self::Unknown(c) => {
                 return write!(f, "{:?}", c);
             }
@@ -257,6 +259,12 @@ impl Lexer {
             } else if c == '}' {
                 self.tokens.push(Token(
                     TokenType::RightBrace,
+                    TokenLocation(self.file_path.clone(), col + 1, line + 1),
+                ));
+                self.consume()?;
+            } else if c == '^' {
+                self.tokens.push(Token(
+                    TokenType::Circumflex,
                     TokenLocation(self.file_path.clone(), col + 1, line + 1),
                 ));
                 self.consume()?;

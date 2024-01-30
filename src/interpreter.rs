@@ -98,6 +98,7 @@ impl Interpreter {
                     Operator::Minus => left_value - right_value,
                     Operator::Multi => left_value * right_value,
                     Operator::Div => left_value / right_value,
+                    Operator::Pow => left_value.powf(right_value),
                 })
             }
             Expr::NegFloatLiteral(value) => {

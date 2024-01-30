@@ -9,6 +9,7 @@ pub enum Operator {
     Minus,
     Multi,
     Div,
+    Pow,
 }
 
 #[derive(Debug, Clone)]
@@ -40,6 +41,7 @@ fn get_prec(op: &Operator) -> usize {
     match op {
         Operator::Plus | Operator::Minus => 1,
         Operator::Multi | Operator::Div => 2,
+        Operator::Pow => 3,
     }
 }
 
@@ -136,10 +138,11 @@ impl Parser {
             }
 
             let op = match &cur.unwrap().0 {
-                &TokenType::Plus => Operator::Plus,
-                &TokenType::Minus => Operator::Minus,
-                &TokenType::Multi => Operator::Multi,
-                &TokenType::Div => Operator::Div,
+                TokenType::Plus => Operator::Plus,
+                TokenType::Minus => Operator::Minus,
+                TokenType::Multi => Operator::Multi,
+                TokenType::Div => Operator::Div,
+                TokenType::Circumflex => Operator::Pow,
                 _ => return Ok(left),
             };
 
