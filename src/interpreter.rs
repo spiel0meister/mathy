@@ -21,12 +21,14 @@ impl Display for Data {
             Self::Float(value) => writeln!(f, "{}", value)?,
             Self::List(datas) => {
                 let mut buf = String::from("[");
-                for data in datas {
+                for (i, data) in datas.iter().enumerate() {
                     match data {
                         Data::Float(value) => buf.push_str(value.to_string().as_str()),
                         Data::List(_) => buf.push_str(data.to_string().as_str()),
                     };
-                    buf.push_str(", ");
+                    if i != datas.len() - 1 {
+                        buf.push_str(", ");
+                    }
                 }
                 buf.push(']');
 
@@ -49,11 +51,31 @@ pub struct Interpreter {
 fn apply_op(left: Data, right: Data, op: Operator) -> Result<Data> {
     let left_val = match left {
         Data::Float(value1) => value1,
-        Data::List(_) => return Err(error!(Other, "Operators unsupported on lists.")),
+        Data::List(values) => {
+            return Ok(Data::List(
+                values
+                    .iter()
+                    .map(|data| {
+                        apply_op(data.clone(), right.clone(), op.clone())
+                            .unwrap_or_else(|err| panic!("{:?}", err))
+                    })
+                    .collect(),
+            ))
+        }
     };
     let right_val = match right {
         Data::Float(value1) => value1,
-        Data::List(_) => return Err(error!(Other, "Operators unsupported on lists.")),
+        Data::List(values) => {
+            return Ok(Data::List(
+                values
+                    .iter()
+                    .map(|data| {
+                        apply_op(left.clone(), data.clone(), op.clone())
+                            .unwrap_or_else(|err| panic!("{:?}", err))
+                    })
+                    .collect(),
+            ))
+        }
     };
 
     Ok(match op {
@@ -63,6 +85,33 @@ fn apply_op(left: Data, right: Data, op: Operator) -> Result<Data> {
         Operator::Div => Data::Float(left_val / right_val),
         Operator::Pow => Data::Float(left_val.powf(right_val)),
     })
+}
+
+fn apply_sin(data: Data) -> Data {
+    match data {
+        Data::Float(value) => Data::Float(value.sin()),
+        Data::List(values) => {
+            Data::List(values.iter().map(|data| apply_sin(data.clone())).collect())
+        }
+    }
+}
+
+fn apply_cos(data: Data) -> Data {
+    match data {
+        Data::Float(value) => Data::Float(value.cos()),
+        Data::List(values) => {
+            Data::List(values.iter().map(|data| apply_sin(data.clone())).collect())
+        }
+    }
+}
+
+fn apply_tan(data: Data) -> Data {
+    match data {
+        Data::Float(value) => Data::Float(value.tan()),
+        Data::List(values) => {
+            Data::List(values.iter().map(|data| apply_sin(data.clone())).collect())
+        }
+    }
 }
 
 impl Interpreter {
@@ -107,7 +156,7 @@ impl Interpreter {
                 if let Some(data) = self.get_variable(name) {
                     match data {
                         Data::Float(value) => return Ok(Expr::from(value)),
-                        Data::List(values) => return Err(error!(Other, "???")),
+                        Data::List(_) => return Err(error!(Other, "???")),
                     };
                 }
                 return Err(error!(Other, "Undefiend variable: {:?}", name));
@@ -129,7 +178,17 @@ impl Interpreter {
                     self.transform_fn_expr((parameters.to_vec(), args.to_vec()), right.as_ref())?;
                 out = Expr::Expr(Box::new(left_), op.clone(), Box::new(right_));
             }
-            Expr::List(_) => todo!(),
+            Expr::List(exprs) => {
+                return Ok(Expr::List(
+                    exprs
+                        .iter()
+                        .map(|expr| {
+                            self.transform_fn_expr((parameters.clone(), args.clone()), expr)
+                                .unwrap_or_else(|err| panic!("{:?}", err))
+                        })
+                        .collect(),
+                ))
+            }
             Expr::FloatLiteral(_) | Expr::NegFloatLiteral(_) => out = expr.clone(),
         };
 
@@ -167,30 +226,21 @@ impl Interpreter {
                         return Err(error!(Other, "Too many arguments for sin!"));
                     }
                     let arg = self.evaluate_expr(&args[0])?;
-                    match arg {
-                        Data::Float(value) => Ok(Data::Float(value.sin())),
-                        Data::List(values) => return Err(error!(Other, "???")),
-                    }
+                    Ok(apply_sin(arg))
                 }
                 "cos" => {
                     if args.len() > 1 {
                         return Err(error!(Other, "Too many arguments for cos!"));
                     }
                     let arg = self.evaluate_expr(&args[0])?;
-                    match arg {
-                        Data::Float(value) => Ok(Data::Float(value.cos())),
-                        Data::List(values) => return Err(error!(Other, "???")),
-                    }
+                    Ok(apply_cos(arg))
                 }
                 "tan" => {
                     if args.len() > 1 {
                         return Err(error!(Other, "Too many arguments for tan!"));
                     }
                     let arg = self.evaluate_expr(&args[0])?;
-                    match arg {
-                        Data::Float(value) => Ok(Data::Float(value.tan())),
-                        Data::List(values) => return Err(error!(Other, "???")),
-                    }
+                    Ok(apply_tan(arg))
                 }
                 _ => {
                     let Some((parameters, expr)) = self.functions.get(name) else {
@@ -217,7 +267,6 @@ impl Interpreter {
 
                 Ok(Data::List(vals))
             }
-            _ => unreachable!(),
         }
     }
 
@@ -282,15 +331,21 @@ impl Interpreter {
                 Parsed::FromLoop(min_expr, max_expr, ident_expr, step_expr, block) => {
                     let min = match self.evaluate_expr(&min_expr)? {
                         Data::Float(value) => value,
-                        Data::List(values) => return Err(error!(Other, "???")),
+                        Data::List(_) => {
+                            return Err(error!(Other, "From-to-as-loop cannot contain list"))
+                        }
                     };
                     let max = match self.evaluate_expr(&max_expr)? {
                         Data::Float(value) => value,
-                        Data::List(values) => return Err(error!(Other, "???")),
+                        Data::List(_) => {
+                            return Err(error!(Other, "From-to-as-loop cannot contain list"))
+                        }
                     };
                     let step = match self.evaluate_expr(&step_expr)? {
                         Data::Float(value) => value,
-                        Data::List(values) => return Err(error!(Other, "???")),
+                        Data::List(_) => {
+                            return Err(error!(Other, "From-to-as-loop cannot contain list"))
+                        }
                     };
                     let Expr::Ident(name) = ident_expr else {
                         return Err(error!(Other, "Internal error!"));

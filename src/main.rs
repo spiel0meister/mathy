@@ -26,7 +26,8 @@ fn main() -> Result<()> {
         exit(1);
     }
 
-    let mut parser = Parser::new(out.unwrap());
+    let out = out.unwrap();
+    let mut parser = Parser::new(out);
     let out = parser.parse();
     if let Err(err) = out {
         if let Some(msg) = err.into_inner() {

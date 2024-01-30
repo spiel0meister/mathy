@@ -106,11 +106,10 @@ impl Parser {
                         .peek(0)
                         .is_some_and(|Token(t, _)| t != &TokenType::RightParen)
                     {
-                        let arg = self.parse_expr(1, false)?;
-                        args.push(arg);
-                        if &self.peek(0).unwrap().0 == &TokenType::Comma {
+                        if self.peek(0).unwrap().0 == TokenType::Comma {
                             self.consume()?;
                         }
+                        args.push(self.parse_expr(1, is_function)?);
                     }
                     left = Expr::FunctionCall(name.to_string(), args);
                 } else {
@@ -138,7 +137,6 @@ impl Parser {
                     }
                     out.push(self.parse_expr(1, is_function)?);
                 }
-                self.consume()?;
 
                 left = Expr::List(out);
             } else {

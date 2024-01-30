@@ -6,24 +6,43 @@ use std::{
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenType {
+    /// Represents an identifier.
     Ident(String),
+    /// Represents a float.
     FloatLiteral(String),
+    /// Represents the '#' character.
     Comment,
+    /// Represents an unknown character.
     Unknown(char),
+    /// Represents a newline character.
     Newline,
+    /// Represents the '=' character.
     Equals,
+    /// Represents the '(' character.
     LeftParen,
+    /// Represents the ')' character.
     RightParen,
+    /// Represents the '{' character.
     LeftBrace,
+    /// Represents the '}' character.
     RightBrace,
+    /// Represents the '[' character.
     LeftBracket,
+    /// Represents the ']' character.
     RightBracket,
+    /// Represents a keyword.
     Keyword(String),
+    /// Represents the ',' character.
     Comma,
+    /// Represents the '+' character.
     Plus,
+    /// Represents the '-' character.
     Minus,
+    /// Represents the '*' character.
     Multi,
+    /// Represents the '/' character.
     Div,
+    /// Represents the '^' character.
     Circumflex,
 }
 
@@ -113,7 +132,8 @@ impl Lexer {
         Ok(cur)
     }
 
-    fn parse_text(&mut self, col: u32, row: u32) -> Result<()> {
+    fn parse_text(&mut self, col: u32, row: u32) -> Result<u32> {
+        let mut col_delta = 0u32;
         let mut buf = String::new();
         buf.push(self.consume()?);
 
@@ -121,6 +141,7 @@ impl Lexer {
             .peek(0)
             .is_some_and(|c| c.is_ascii_alphabetic() || c.is_ascii_digit() || c == '_')
         {
+            col_delta += 1;
             buf.push(self.consume()?);
         }
 
@@ -135,10 +156,11 @@ impl Lexer {
             )),
         }
 
-        Ok(())
+        Ok(col_delta)
     }
 
-    fn parse_float(&mut self, row: u32, col: u32) -> Result<()> {
+    fn parse_float(&mut self, row: u32, col: u32) -> Result<u32> {
+        let mut col_delta = 0u32;
         let mut buf = String::new();
         let mut period = false;
 
@@ -156,6 +178,7 @@ impl Lexer {
         {
             if self.peek(0).unwrap() == '_' {
                 self.consume()?;
+                col_delta += 1;
                 continue;
             }
 
@@ -167,6 +190,7 @@ impl Lexer {
                 }
             }
             buf.push(self.consume()?);
+            col_delta += 1;
         }
 
         if !buf.contains('.') {
@@ -178,7 +202,7 @@ impl Lexer {
             TokenLocation(self.file_path.clone(), col, row),
         ));
 
-        Ok(())
+        Ok(col_delta)
     }
 
     pub fn tokenize(&mut self) -> Result<Vec<Token>> {
@@ -197,9 +221,9 @@ impl Lexer {
             } else if c.is_whitespace() {
                 self.consume()?;
             } else if c.is_ascii_alphabetic() || c == '_' {
-                self.parse_text(col + 1, line + 1)?;
+                col += self.parse_text(line + 1, col + 1)?;
             } else if c == '.' || c.is_digit(10) {
-                self.parse_float(col + 1, line + 1)?;
+                col += self.parse_float(line + 1, col + 1)?;
             } else if c == '=' {
                 self.tokens.push(Token(
                     TokenType::Equals,

@@ -17,6 +17,7 @@ In this language you can:
 ```mth
 x = 2 * 5 + 1
 y = x * 2
+z = [x, y, 20] * 10
 ```
 
 2. Declare functions:
