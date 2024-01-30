@@ -18,7 +18,7 @@ pub enum Data {
 impl Display for Data {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Float(value) => writeln!(f, "{}", value)?,
+            Self::Float(value) => write!(f, "{}", value)?,
             Self::List(datas) => {
                 let mut buf = String::from("[");
                 for (i, data) in datas.iter().enumerate() {
@@ -364,7 +364,24 @@ impl Interpreter {
                     let scope = self.execute_block(block)?;
                     self.clean_scope(scope)?;
                 }
-                _ => unreachable!("Internal error!"),
+                Parsed::ForLoop(ident_expr, list_expr, block) => {
+                    let list = match self.evaluate_expr(&list_expr)? {
+                        Data::List(datas) => datas,
+                        Data::Float(_) => return Err(error!(Other, "Expected list!")),
+                    };
+                    let Expr::Ident(name) = ident_expr else {
+                        return Err(error!(Other, "Expected identefier!"));
+                    };
+                    self.variables
+                        .insert(name.clone(), list.get(0).unwrap().clone());
+                    for data in &list[1..] {
+                        let scope = self.execute_block(block.clone())?;
+                        self.clean_scope(scope)?;
+                        *self.variables.get_mut(&name).unwrap() = data.clone();
+                    }
+                    self.variables.remove(&name);
+                }
+                _ => return Err(error!(Other, "Some error!")),
             }
             current += 1;
         }

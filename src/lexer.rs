@@ -146,7 +146,7 @@ impl Lexer {
         }
 
         match buf.as_str() {
-            "from" | "to" | "as" | "with" | "step" => self.tokens.push(Token(
+            "from" | "to" | "as" | "with" | "step" | "for" | "in" => self.tokens.push(Token(
                 TokenType::Keyword(buf),
                 TokenLocation(self.file_path.clone(), col, row),
             )),

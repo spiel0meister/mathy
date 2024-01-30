@@ -1,6 +1,6 @@
 use std::io::{Error, ErrorKind, Result};
 
-use crate::lexer::{Token, TokenType};
+use crate::lexer::{Token, TokenLocation, TokenType};
 use crate::util::error;
 
 #[derive(Debug, Clone)]
@@ -38,6 +38,7 @@ impl From<&f64> for Expr {
 pub enum Parsed {
     FunctionDecleration(Token, Vec<Token>, Expr),
     FromLoop(Expr, Expr, Expr, Expr, Vec<Parsed>),
+    ForLoop(Expr, Expr, Vec<Parsed>),
     Block(Vec<Parsed>),
     Declaration(Token, Expr),
     PrintExpr(Expr),
@@ -240,12 +241,40 @@ impl Parser {
         Ok(block)
     }
 
+    fn parse_for_block(&mut self) -> Result<Parsed> {
+        self.consume()?;
+        let ident = self.parse_expr(1, false)?;
+        let t = self.consume()?;
+        let Token(TokenType::Keyword(keyword), _) = t else {
+            return Err(error!(Other, "Expected \"in\""));
+        };
+        if keyword.as_str() != "in" {
+            return Err(error!(Other, "Expected \"in\""));
+        };
+        let list = self.parse_expr(1, false)?;
+        let block: Vec<Parsed> = self.parse_block()?;
+
+        Ok(Parsed::ForLoop(ident, list, block))
+    }
+
     fn parse_from_block(&mut self) -> Result<Parsed> {
         self.consume()?;
         let min = self.parse_expr(1, false)?;
-        self.consume()?;
+        let t = self.consume()?;
+        let Token(TokenType::Keyword(keyword), _) = t else {
+            return Err(error!(Other, "Expected \"to\""));
+        };
+        if keyword.as_str() != "to" {
+            return Err(error!(Other, "Expected \"to\""));
+        };
         let max = self.parse_expr(1, false)?;
-        self.consume()?;
+        let t = self.consume()?;
+        let Token(TokenType::Keyword(keyword), _) = t else {
+            return Err(error!(Other, "Expected \"as\""));
+        };
+        if keyword.as_str() != "as" {
+            return Err(error!(Other, "Expected \"to\""));
+        };
         let ident = self.parse_expr(1, false)?;
         let mut step: Expr = Expr::FloatLiteral("1.0".to_string());
         let Some(t) = self.peek(0) else {
@@ -293,7 +322,6 @@ impl Parser {
     }
 
     fn parse_function_declaration(&mut self, ident: Token) -> Result<Parsed> {
-        // println!("{:?}", &self.peek(0));
         let mut parameters: Vec<Token> = Vec::new();
         self.consume()?;
         self.consume()?;
@@ -338,7 +366,6 @@ impl Parser {
     }
 
     pub fn parse(&mut self) -> Result<Vec<Parsed>> {
-        // println!("Tokens: {:?}", &self.tokens);
         while let Some(Token(token_type, loc)) = self.peek(0) {
             let token = self.peek(0).unwrap().clone();
             match token_type {
@@ -361,16 +388,17 @@ impl Parser {
                         self.parsed.push(out);
                     }
                 }
-                TokenType::Keyword(keyword) => {
-                    if keyword.as_str() != "from" {
-                        return Err(error!(
-                            Other,
-                            "Expected keyword \"from\", got keyword {:?} at {}", keyword, loc
-                        ));
+                TokenType::Keyword(keyword) => match keyword.as_str() {
+                    "from" => {
+                        let out = self.parse_from_block()?;
+                        self.parsed.push(out);
                     }
-                    let out = self.parse_from_block()?;
-                    self.parsed.push(out);
-                }
+                    "for" => {
+                        let out = self.parse_for_block()?;
+                        self.parsed.push(out);
+                    }
+                    _ => return Err(error!(Other, "Unexpected keyword {} at {}", keyword, loc)),
+                },
                 TokenType::FloatLiteral(_) => {
                     let out = self.parse_print()?;
                     self.parsed.push(out);
@@ -387,10 +415,6 @@ impl Parser {
                     let block = self.parse_block()?;
                     self.parsed.push(Parsed::Block(block));
                 }
-                // TokenType::RightParen => {
-                //     eprintln!("{:?}", loc);
-                //     self.consume()?;
-                // }
                 token => todo!("Handle {:?} at {}", token, loc),
             };
         }
