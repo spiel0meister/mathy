@@ -17,7 +17,6 @@ In this language you can:
 ```mth
 x = 2 * 5 + 1
 y = x * 2
-z = [x, y, 20] * 10
 ```
 
 2. Declare functions:
@@ -40,7 +39,15 @@ from 0 to 10 as x with step 2 {
 }
 ```
 
-4. Print expressions:
+4. Use lists and iterate over them with a for-in loop:
+```mth
+x = [1, 2, 3]
+for y in x {
+    y
+}
+```
+
+5. Print expressions:
 ```mth
 f(x) = x * 2 - 2
 from 0 to 10 as x {

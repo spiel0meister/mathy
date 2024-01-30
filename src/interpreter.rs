@@ -40,14 +40,6 @@ impl Display for Data {
     }
 }
 
-type Scope = Vec<String>;
-
-pub struct Interpreter {
-    parsed: Vec<Parsed>,
-    variables: HashMap<String, Data>,
-    functions: HashMap<String, (Vec<String>, Expr)>,
-}
-
 fn apply_op(left: Data, right: Data, op: Operator) -> Result<Data> {
     let left_val = match left {
         Data::Float(value1) => value1,
@@ -112,6 +104,14 @@ fn apply_tan(data: Data) -> Data {
             Data::List(values.iter().map(|data| apply_sin(data.clone())).collect())
         }
     }
+}
+
+type Scope = Vec<String>;
+
+pub struct Interpreter {
+    parsed: Vec<Parsed>,
+    variables: HashMap<String, Data>,
+    functions: HashMap<String, (Vec<String>, Expr)>,
 }
 
 impl Interpreter {
