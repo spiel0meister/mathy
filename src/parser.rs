@@ -22,6 +22,18 @@ pub enum Expr {
     Expr(Box<Expr>, Operator, Box<Expr>),
 }
 
+impl From<f64> for Expr {
+    fn from(value: f64) -> Self {
+        Self::FloatLiteral(value.to_string())
+    }
+}
+
+impl From<&f64> for Expr {
+    fn from(value: &f64) -> Self {
+        Self::FloatLiteral(value.to_string())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Parsed {
     FunctionDecleration(Token, Vec<Token>, Expr),

@@ -1,4 +1,5 @@
 # Grammar
+
 $$
 \begin{align}
     [\text{file}] &\to [\text{stmt}]* \\

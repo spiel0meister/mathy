@@ -3,17 +3,50 @@ use crate::parser::{Expr, Operator, Parsed};
 use crate::util::error;
 
 use std::f64::consts::PI;
+use std::fmt::Display;
 use std::{
     collections::HashMap,
     io::{Error, ErrorKind, Result},
 };
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum Data {
+    Float(f64),
+}
+
+impl Display for Data {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Float(value) => writeln!(f, "{}", value)?,
+        };
+
+        Ok(())
+    }
+}
+
 type Scope = Vec<String>;
 
 pub struct Interpreter {
     parsed: Vec<Parsed>,
-    variables: HashMap<String, f64>,
+    variables: HashMap<String, Data>,
     functions: HashMap<String, (Vec<String>, Expr)>,
+}
+
+fn apply_op(left: Data, right: Data, op: Operator) -> Result<Data> {
+    let left_val = match left {
+        Data::Float(value1) => value1,
+    };
+    let right_val = match right {
+        Data::Float(value1) => value1,
+    };
+
+    Ok(match op {
+        Operator::Plus => Data::Float(left_val + right_val),
+        Operator::Minus => Data::Float(left_val - right_val),
+        Operator::Multi => Data::Float(left_val * right_val),
+        Operator::Div => Data::Float(left_val / right_val),
+        Operator::Pow => Data::Float(left_val.powf(right_val)),
+    })
 }
 
 impl Interpreter {
@@ -25,12 +58,18 @@ impl Interpreter {
         }
     }
 
-    fn get_variable(&self, name: &str) -> Option<f64> {
+    fn get_variable(&self, name: &str) -> Option<Data> {
         match name {
-            "PI" => Some(PI),
-            "TAU" => Some(PI * 2.0),
-            "GLR" => Some(1.618_033_988_749_894f64), // Golden ratio
-            _ => self.variables.get(name).copied(),
+            "PI" => Some(Data::Float(PI)),
+            "TAU" => Some(Data::Float(PI * 2.0)),
+            "GLR" => Some(Data::Float(1.618_033_988_749_894f64)), // Golden ratio
+            _ => {
+                let Some(data) = self.variables.get(name) else {
+                    return None;
+                };
+
+                Some(data.clone())
+            }
         }
     }
 
@@ -50,8 +89,10 @@ impl Interpreter {
                         return Ok(out);
                     }
                 }
-                if let Some(value) = self.get_variable(name) {
-                    return Ok(Expr::FloatLiteral(value.to_string()));
+                if let Some(data) = self.get_variable(name) {
+                    match data {
+                        Data::Float(value) => return Ok(Expr::from(value)),
+                    };
                 }
                 return Err(error!(Other, "Undefiend variable: {:?}", name));
             }
@@ -78,34 +119,30 @@ impl Interpreter {
         Ok(out)
     }
 
-    fn evaluate_expr(&self, expr: &Expr) -> Result<f64> {
+    fn evaluate_expr(&self, expr: &Expr) -> Result<Data> {
         match expr {
             Expr::Ident(name) => {
-                if let Some(value) = self.get_variable(name) {
-                    Ok(value.clone())
+                if let Some(data) = self.get_variable(name) {
+                    return Ok(data.clone());
                 } else {
                     return Err(error!(Other, "Undefined variable: {:?}", name));
                 }
             }
-            Expr::FloatLiteral(value) => Ok(value
-                .parse()
-                .map_err(|err| error!(InvalidInput, "{}", err))?),
+            Expr::FloatLiteral(value) => Ok(Data::Float(
+                value
+                    .parse()
+                    .map_err(|err| error!(InvalidInput, "{}", err))?,
+            )),
             Expr::Expr(left, op, right) => {
-                let left_value = self.evaluate_expr(&left)?;
-                let right_value = self.evaluate_expr(&right)?;
-                Ok(match op {
-                    Operator::Plus => left_value + right_value,
-                    Operator::Minus => left_value - right_value,
-                    Operator::Multi => left_value * right_value,
-                    Operator::Div => left_value / right_value,
-                    Operator::Pow => left_value.powf(right_value),
-                })
+                let left = self.evaluate_expr(&left)?;
+                let right = self.evaluate_expr(&right)?;
+                apply_op(left, right, op.clone())
             }
             Expr::NegFloatLiteral(value) => {
                 let value_f64: f64 = value
                     .parse()
                     .map_err(|err| error!(InvalidInput, "{}", err))?;
-                Ok(-1.0 * value_f64)
+                Ok(Data::Float(-1.0 * value_f64))
             }
             Expr::FunctionCall(name, args) => match name.as_str() {
                 "sin" => {
@@ -113,21 +150,27 @@ impl Interpreter {
                         return Err(error!(Other, "Too many arguments for sin!"));
                     }
                     let arg = self.evaluate_expr(&args[0])?;
-                    Ok(arg.sin())
+                    match arg {
+                        Data::Float(value) => Ok(Data::Float(value.sin())),
+                    }
                 }
                 "cos" => {
                     if args.len() > 1 {
                         return Err(error!(Other, "Too many arguments for cos!"));
                     }
                     let arg = self.evaluate_expr(&args[0])?;
-                    Ok(arg.cos())
+                    match arg {
+                        Data::Float(value) => Ok(Data::Float(value.cos())),
+                    }
                 }
                 "tan" => {
                     if args.len() > 1 {
                         return Err(error!(Other, "Too many arguments for tan!"));
                     }
                     let arg = self.evaluate_expr(&args[0])?;
-                    Ok(arg.tan())
+                    match arg {
+                        Data::Float(value) => Ok(Data::Float(value.tan())),
+                    }
                 }
                 _ => {
                     let Some((parameters, expr)) = self.functions.get(name) else {
@@ -206,19 +249,25 @@ impl Interpreter {
                     scope.push(f.to_string());
                 }
                 Parsed::FromLoop(min_expr, max_expr, ident_expr, step_expr, block) => {
-                    let min = self.evaluate_expr(&min_expr)?;
-                    let max = self.evaluate_expr(&max_expr)?;
-                    let step = self.evaluate_expr(&step_expr)?;
+                    let min = match self.evaluate_expr(&min_expr)? {
+                        Data::Float(value) => value,
+                    };
+                    let max = match self.evaluate_expr(&max_expr)? {
+                        Data::Float(value) => value,
+                    };
+                    let step = match self.evaluate_expr(&step_expr)? {
+                        Data::Float(value) => value,
+                    };
                     let Expr::Ident(name) = ident_expr else {
                         return Err(error!(Other, "Internal error!"));
                     };
                     let mut i = min;
-                    self.variables.insert(name.to_string(), i);
-                    while i <= max {
+                    self.variables.insert(name.to_string(), Data::Float(i));
+                    while i < max {
                         let scope = self.execute_block(block.to_vec())?;
                         self.clean_scope(scope)?;
                         i += step;
-                        *self.variables.get_mut(&name).unwrap() = i;
+                        *self.variables.get_mut(&name).unwrap() = Data::Float(i);
                     }
                     self.variables.remove(&name);
                 }
