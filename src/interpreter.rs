@@ -41,6 +41,22 @@ impl Display for Data {
 }
 
 fn apply_op(left: Data, right: Data, op: Operator) -> Result<Data> {
+    if let Data::List(ref values1) = left {
+        if let Data::List(ref values2) = right {
+            if values1.len() != values2.len() {
+                return Err(error!(Other, "Lists must be same length!"));
+            }
+
+            return Ok(Data::List(
+                values1
+                    .iter()
+                    .zip(values2)
+                    .map(|(value1, value2)| apply_op(value1.clone(), value2.clone(), op.clone()))
+                    .map(|res| res.unwrap_or_else(|err| panic!("Error: {}", err)))
+                    .collect(),
+            ));
+        }
+    };
     let left_val = match left {
         Data::Float(value1) => value1,
         Data::List(values) => {
@@ -287,7 +303,6 @@ impl Interpreter {
     }
 
     fn execute_block(&mut self, block: Vec<Parsed>) -> Result<Scope> {
-        println!("Block: {:#?}", block);
         let mut current = 0usize;
         let mut scope: Scope = Vec::new();
         while block.get(current).is_some() {
