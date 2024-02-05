@@ -247,10 +247,10 @@ impl Parser {
         let ident = self.parse_expr(1, false)?;
         let t = self.consume()?;
         let Token(TokenType::Keyword(keyword), _) = t else {
-            return Err(error!(Other, "Expected \"in\""));
+            return Err(error!(Other, "Expected \"in\" at {}", t.1));
         };
         if keyword.as_str() != "in" {
-            return Err(error!(Other, "Expected \"in\""));
+            return Err(error!(Other, "Expected \"in\", got {} at {}", keyword, t.1));
         };
         let list = self.parse_expr(1, false)?;
         let block: Vec<Parsed> = self.parse_block()?;
@@ -263,18 +263,18 @@ impl Parser {
         let min = self.parse_expr(1, false)?;
         let t = self.consume()?;
         let Token(TokenType::Keyword(keyword), _) = t else {
-            return Err(error!(Other, "Expected \"to\""));
+            return Err(error!(Other, "Expected \"to\" at {}", t.1));
         };
         if keyword.as_str() != "to" {
-            return Err(error!(Other, "Expected \"to\""));
+            return Err(error!(Other, "Expected \"to\", got {} at {}", keyword, t.1));
         };
         let max = self.parse_expr(1, false)?;
         let t = self.consume()?;
         let Token(TokenType::Keyword(keyword), _) = t else {
-            return Err(error!(Other, "Expected \"as\""));
+            return Err(error!(Other, "Expected \"as\" at {}", t.1));
         };
         if keyword.as_str() != "as" {
-            return Err(error!(Other, "Expected \"to\""));
+            return Err(error!(Other, "Expected \"to\", got {} at {}", keyword, t.1));
         };
         let ident = self.parse_expr(1, false)?;
         let mut step: Expr = Expr::FloatLiteral("1.0".to_string());
@@ -344,7 +344,7 @@ impl Parser {
 
     fn parse_print(&mut self) -> Result<Parsed> {
         let expr = self.parse_expr(1, false)?;
-        println!("{:?}", expr);
+        // println!("{:?}", expr);
 
         Ok(Parsed::PrintExpr(expr))
     }

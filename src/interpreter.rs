@@ -9,6 +9,15 @@ use std::{
     io::{Error, ErrorKind, Result},
 };
 
+impl Into<Expr> for Data {
+    fn into(self) -> Expr {
+        match self {
+            Data::Float(value) => Expr::from(value),
+            Data::List(values) => Expr::List(values.into_iter().map(|data| data.into()).collect()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Data {
     Float(f64),
@@ -95,30 +104,15 @@ fn apply_op(left: Data, right: Data, op: Operator) -> Result<Data> {
     })
 }
 
-fn apply_sin(data: Data) -> Data {
+fn apply_func(data: Data, func: fn(f64) -> Data) -> Data {
     match data {
-        Data::Float(value) => Data::Float(value.sin()),
-        Data::List(values) => {
-            Data::List(values.iter().map(|data| apply_sin(data.clone())).collect())
-        }
-    }
-}
-
-fn apply_cos(data: Data) -> Data {
-    match data {
-        Data::Float(value) => Data::Float(value.cos()),
-        Data::List(values) => {
-            Data::List(values.iter().map(|data| apply_sin(data.clone())).collect())
-        }
-    }
-}
-
-fn apply_tan(data: Data) -> Data {
-    match data {
-        Data::Float(value) => Data::Float(value.tan()),
-        Data::List(values) => {
-            Data::List(values.iter().map(|data| apply_sin(data.clone())).collect())
-        }
+        Data::Float(value) => func(value),
+        Data::List(values) => Data::List(
+            values
+                .into_iter()
+                .map(|data| apply_func(data, func))
+                .collect(),
+        ),
     }
 }
 
@@ -170,10 +164,7 @@ impl Interpreter {
                     }
                 }
                 if let Some(data) = self.get_variable(name) {
-                    match data {
-                        Data::Float(value) => return Ok(Expr::from(value)),
-                        Data::List(_) => return Err(error!(Other, "???")),
-                    };
+                    return Ok(data.into());
                 }
                 return Err(error!(Other, "Undefiend variable: {:?}", name));
             }
@@ -242,21 +233,21 @@ impl Interpreter {
                         return Err(error!(Other, "Too many arguments for sin!"));
                     }
                     let arg = self.evaluate_expr(&args[0])?;
-                    Ok(apply_sin(arg))
+                    Ok(apply_func(arg, |arg| Data::Float(arg.sin())))
                 }
                 "cos" => {
                     if args.len() > 1 {
                         return Err(error!(Other, "Too many arguments for cos!"));
                     }
                     let arg = self.evaluate_expr(&args[0])?;
-                    Ok(apply_cos(arg))
+                    Ok(apply_func(arg, |arg| Data::Float(arg.cos())))
                 }
                 "tan" => {
                     if args.len() > 1 {
                         return Err(error!(Other, "Too many arguments for tan!"));
                     }
                     let arg = self.evaluate_expr(&args[0])?;
-                    Ok(apply_tan(arg))
+                    Ok(apply_func(arg, |arg| Data::Float(arg.tan())))
                 }
                 _ => {
                     let Some((parameters, expr)) = self.functions.get(name) else {
@@ -336,7 +327,7 @@ impl Interpreter {
                             if let TokenType::Ident(name) = t {
                                 name.to_string()
                             } else {
-                                panic!("Internal error!");
+                                unreachable!("Internal error!");
                             }
                         })
                         .collect();
@@ -364,7 +355,7 @@ impl Interpreter {
                         }
                     };
                     let Expr::Ident(name) = ident_expr else {
-                        return Err(error!(Other, "Internal error!"));
+                        unreachable!("Internal error!");
                     };
                     let mut i = min;
                     self.variables.insert(name.to_string(), Data::Float(i));
@@ -420,7 +411,7 @@ impl Interpreter {
                         self.variables.insert(name.clone(), data);
                     }
                 }
-                _ => return Err(error!(Other, "Some error!")),
+                _ => unreachable!("Some error!"),
             }
             current += 1;
         }

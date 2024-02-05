@@ -206,14 +206,14 @@ impl Lexer {
     }
 
     pub fn tokenize(&mut self) -> Result<Vec<Token>> {
-        let mut col = 0u32;
-        let mut line = 0u32;
+        let mut col = 1u32;
+        let mut line = 1u32;
         while self.peek(0).is_some() {
             let c = self.peek(0).unwrap();
             if c == '\n' {
                 self.tokens.push(Token(
                     TokenType::Newline,
-                    TokenLocation(self.file_path.clone(), col + 1, line + 1),
+                    TokenLocation(self.file_path.clone(), col, line),
                 ));
                 line += 1;
                 col = 0;
@@ -221,97 +221,97 @@ impl Lexer {
             } else if c.is_whitespace() {
                 self.consume()?;
             } else if c.is_ascii_alphabetic() || c == '_' {
-                col += self.parse_text(line + 1, col + 1)?;
+                col += self.parse_text(line, col)?;
             } else if c == '.' || c.is_digit(10) {
-                col += self.parse_float(line + 1, col + 1)?;
+                col += self.parse_float(line, col)?;
             } else if c == '=' {
                 self.tokens.push(Token(
                     TokenType::Equals,
-                    TokenLocation(self.file_path.clone(), col + 1, line + 1),
+                    TokenLocation(self.file_path.clone(), col, line),
                 ));
                 self.consume()?;
             } else if c == '+' {
                 self.tokens.push(Token(
                     TokenType::Plus,
-                    TokenLocation(self.file_path.clone(), col + 1, line + 1),
+                    TokenLocation(self.file_path.clone(), col, line),
                 ));
                 self.consume()?;
             } else if c == '-' {
                 self.tokens.push(Token(
                     TokenType::Minus,
-                    TokenLocation(self.file_path.clone(), col + 1, line + 1),
+                    TokenLocation(self.file_path.clone(), col, line),
                 ));
                 self.consume()?;
             } else if c == '*' {
                 self.tokens.push(Token(
                     TokenType::Multi,
-                    TokenLocation(self.file_path.clone(), col + 1, line + 1),
+                    TokenLocation(self.file_path.clone(), col, line),
                 ));
                 self.consume()?;
             } else if c == ',' {
                 self.tokens.push(Token(
                     TokenType::Comma,
-                    TokenLocation(self.file_path.clone(), col + 1, line + 1),
+                    TokenLocation(self.file_path.clone(), col, line),
                 ));
                 self.consume()?;
             } else if c == '/' {
                 self.tokens.push(Token(
                     TokenType::Div,
-                    TokenLocation(self.file_path.clone(), col + 1, line + 1),
+                    TokenLocation(self.file_path.clone(), col, line),
                 ));
                 self.consume()?;
             } else if c == '#' {
                 self.tokens.push(Token(
                     TokenType::Comment,
-                    TokenLocation(self.file_path.clone(), col + 1, line + 1),
+                    TokenLocation(self.file_path.clone(), col, line),
                 ));
                 self.consume()?;
             } else if c == '(' {
                 self.tokens.push(Token(
                     TokenType::LeftParen,
-                    TokenLocation(self.file_path.clone(), col + 1, line + 1),
+                    TokenLocation(self.file_path.clone(), col, line),
                 ));
                 self.consume()?;
             } else if c == ')' {
                 self.tokens.push(Token(
                     TokenType::RightParen,
-                    TokenLocation(self.file_path.clone(), col + 1, line + 1),
+                    TokenLocation(self.file_path.clone(), col, line),
                 ));
                 self.consume()?;
             } else if c == '{' {
                 self.tokens.push(Token(
                     TokenType::LeftBrace,
-                    TokenLocation(self.file_path.clone(), col + 1, line + 1),
+                    TokenLocation(self.file_path.clone(), col, line),
                 ));
                 self.consume()?;
             } else if c == '}' {
                 self.tokens.push(Token(
                     TokenType::RightBrace,
-                    TokenLocation(self.file_path.clone(), col + 1, line + 1),
+                    TokenLocation(self.file_path.clone(), col, line),
                 ));
                 self.consume()?;
             } else if c == '[' {
                 self.tokens.push(Token(
                     TokenType::LeftBracket,
-                    TokenLocation(self.file_path.clone(), col + 1, line + 1),
+                    TokenLocation(self.file_path.clone(), col, line),
                 ));
                 self.consume()?;
             } else if c == ']' {
                 self.tokens.push(Token(
                     TokenType::RightBracket,
-                    TokenLocation(self.file_path.clone(), col + 1, line + 1),
+                    TokenLocation(self.file_path.clone(), col, line),
                 ));
                 self.consume()?;
             } else if c == '^' {
                 self.tokens.push(Token(
                     TokenType::Circumflex,
-                    TokenLocation(self.file_path.clone(), col + 1, line + 1),
+                    TokenLocation(self.file_path.clone(), col, line),
                 ));
                 self.consume()?;
             } else {
                 self.tokens.push(Token(
                     TokenType::Unknown(c),
-                    TokenLocation(self.file_path.clone(), col + 1, line + 1),
+                    TokenLocation(self.file_path.clone(), col, line),
                 ));
                 self.consume()?;
             }
