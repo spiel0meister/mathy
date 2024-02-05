@@ -97,6 +97,12 @@ impl Display for TokenLocation {
     }
 }
 
+macro_rules! token {
+    ($type:ident$(($($value:expr),+))?, $file:expr, $col:expr, $row:expr) => {
+        Token(TokenType::$type$(($($value),+))?, TokenLocation($file, $col, $row))
+    };
+}
+
 pub struct Lexer {
     file_path: String,
     content: String,
@@ -146,14 +152,13 @@ impl Lexer {
         }
 
         match buf.as_str() {
-            "from" | "to" | "as" | "with" | "step" | "for" | "in" => self.tokens.push(Token(
-                TokenType::Keyword(buf),
-                TokenLocation(self.file_path.clone(), col, row),
-            )),
-            _ => self.tokens.push(Token(
-                TokenType::Ident(buf),
-                TokenLocation(self.file_path.clone(), col, row),
-            )),
+            "from" | "to" | "as" | "with" | "step" | "for" | "in" => {
+                self.tokens
+                    .push(token!(Keyword(buf), self.file_path.clone(), col, row))
+            }
+            _ => self
+                .tokens
+                .push(token!(Ident(buf), self.file_path.clone(), col, row)),
         }
 
         Ok(col_delta)
@@ -197,10 +202,8 @@ impl Lexer {
             buf.push_str(".0");
         }
 
-        self.tokens.push(Token(
-            TokenType::FloatLiteral(buf),
-            TokenLocation(self.file_path.clone(), col, row),
-        ));
+        self.tokens
+            .push(token!(FloatLiteral(buf), self.file_path.clone(), col, row));
 
         Ok(col_delta)
     }
@@ -211,10 +214,8 @@ impl Lexer {
         while self.peek(0).is_some() {
             let c = self.peek(0).unwrap();
             if c == '\n' {
-                self.tokens.push(Token(
-                    TokenType::Newline,
-                    TokenLocation(self.file_path.clone(), col, line),
-                ));
+                self.tokens
+                    .push(token!(Newline, self.file_path.clone(), col, line));
                 line += 1;
                 col = 0;
                 self.consume()?;
@@ -225,94 +226,64 @@ impl Lexer {
             } else if c == '.' || c.is_digit(10) {
                 col += self.parse_float(line, col)?;
             } else if c == '=' {
-                self.tokens.push(Token(
-                    TokenType::Equals,
-                    TokenLocation(self.file_path.clone(), col, line),
-                ));
+                self.tokens
+                    .push(token!(Equals, self.file_path.clone(), col, line));
                 self.consume()?;
             } else if c == '+' {
-                self.tokens.push(Token(
-                    TokenType::Plus,
-                    TokenLocation(self.file_path.clone(), col, line),
-                ));
+                self.tokens
+                    .push(token!(Plus, self.file_path.clone(), col, line));
                 self.consume()?;
             } else if c == '-' {
-                self.tokens.push(Token(
-                    TokenType::Minus,
-                    TokenLocation(self.file_path.clone(), col, line),
-                ));
+                self.tokens
+                    .push(token!(Minus, self.file_path.clone(), col, line));
                 self.consume()?;
             } else if c == '*' {
-                self.tokens.push(Token(
-                    TokenType::Multi,
-                    TokenLocation(self.file_path.clone(), col, line),
-                ));
+                self.tokens
+                    .push(token!(Multi, self.file_path.clone(), col, line));
                 self.consume()?;
             } else if c == ',' {
-                self.tokens.push(Token(
-                    TokenType::Comma,
-                    TokenLocation(self.file_path.clone(), col, line),
-                ));
+                self.tokens
+                    .push(token!(Comma, self.file_path.clone(), col, line));
                 self.consume()?;
             } else if c == '/' {
-                self.tokens.push(Token(
-                    TokenType::Div,
-                    TokenLocation(self.file_path.clone(), col, line),
-                ));
+                self.tokens
+                    .push(token!(Div, self.file_path.clone(), col, line));
                 self.consume()?;
             } else if c == '#' {
-                self.tokens.push(Token(
-                    TokenType::Comment,
-                    TokenLocation(self.file_path.clone(), col, line),
-                ));
+                self.tokens
+                    .push(token!(Comment, self.file_path.clone(), col, line));
                 self.consume()?;
             } else if c == '(' {
-                self.tokens.push(Token(
-                    TokenType::LeftParen,
-                    TokenLocation(self.file_path.clone(), col, line),
-                ));
+                self.tokens
+                    .push(token!(LeftParen, self.file_path.clone(), col, line));
                 self.consume()?;
             } else if c == ')' {
-                self.tokens.push(Token(
-                    TokenType::RightParen,
-                    TokenLocation(self.file_path.clone(), col, line),
-                ));
+                self.tokens
+                    .push(token!(RightParen, self.file_path.clone(), col, line));
                 self.consume()?;
             } else if c == '{' {
-                self.tokens.push(Token(
-                    TokenType::LeftBrace,
-                    TokenLocation(self.file_path.clone(), col, line),
-                ));
+                self.tokens
+                    .push(token!(LeftBrace, self.file_path.clone(), col, line));
                 self.consume()?;
             } else if c == '}' {
-                self.tokens.push(Token(
-                    TokenType::RightBrace,
-                    TokenLocation(self.file_path.clone(), col, line),
-                ));
+                self.tokens
+                    .push(token!(RightBrace, self.file_path.clone(), col, line));
                 self.consume()?;
             } else if c == '[' {
-                self.tokens.push(Token(
-                    TokenType::LeftBracket,
-                    TokenLocation(self.file_path.clone(), col, line),
-                ));
+                self.tokens
+                    .push(token!(LeftBracket, self.file_path.clone(), col, line));
                 self.consume()?;
             } else if c == ']' {
-                self.tokens.push(Token(
-                    TokenType::RightBracket,
-                    TokenLocation(self.file_path.clone(), col, line),
-                ));
+                self.tokens
+                    .push(token!(RightBracket, self.file_path.clone(), col, line));
                 self.consume()?;
             } else if c == '^' {
-                self.tokens.push(Token(
-                    TokenType::Circumflex,
-                    TokenLocation(self.file_path.clone(), col, line),
-                ));
+                self.tokens
+                    .push(token!(Circumflex, self.file_path.clone(), col, line));
                 self.consume()?;
             } else {
-                self.tokens.push(Token(
-                    TokenType::Unknown(c),
-                    TokenLocation(self.file_path.clone(), col, line),
-                ));
+                self.tokens
+                    .push(token!(Unknown(c), self.file_path.clone(), col, line));
                 self.consume()?;
             }
 
