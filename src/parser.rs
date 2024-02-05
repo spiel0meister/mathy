@@ -279,7 +279,7 @@ impl Parser {
         let ident = self.parse_expr(1, false)?;
         let mut step: Expr = Expr::FloatLiteral("1.0".to_string());
         let Some(t) = self.peek(0) else {
-            return Err(error!(UnexpectedEof, "EOF"));
+            return Err(error!(UnexpectedEof, "Unexpected EOF"));
         };
         let t = t.clone();
         if let Token(TokenType::Keyword(keyword), loc) = t {

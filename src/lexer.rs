@@ -57,15 +57,15 @@ impl Display for TokenType {
             Self::LeftParen => "(",
             Self::LeftBrace => "{",
             Self::LeftBracket => "[",
-            Self::Equals => "=",
-            Self::Comment => "#",
-            Self::Newline => "\\n",
-            Self::FloatLiteral(literal) => literal,
-            Self::Ident(name) => name,
-            Self::Keyword(keyword) => keyword,
             Self::RightParen => ")",
             Self::RightBrace => "}",
             Self::RightBracket => "]",
+            Self::Equals => "=",
+            Self::Comment => "#",
+            Self::Newline => r#"\n"#,
+            Self::FloatLiteral(literal) => literal,
+            Self::Ident(name) => name,
+            Self::Keyword(keyword) => keyword,
             Self::Circumflex => "^",
             Self::Unknown(c) => {
                 return write!(f, "{:?}", c);
@@ -76,8 +76,31 @@ impl Display for TokenType {
     }
 }
 
+impl From<char> for TokenType {
+    fn from(value: char) -> Self {
+        match value {
+            '+' => Self::Plus,
+            '-' => Self::Minus,
+            '*' => Self::Multi,
+            '/' => Self::Div,
+            ',' => Self::Comma,
+            '(' => Self::LeftParen,
+            '{' => Self::LeftBrace,
+            '[' => Self::LeftBracket,
+            ')' => Self::RightParen,
+            '}' => Self::RightBrace,
+            ']' => Self::RightBracket,
+            '=' => Self::Equals,
+            '#' => Self::Comment,
+            '\n' => Self::Newline,
+            '^' => Self::Circumflex,
+            _ => Self::Unknown(value),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
-/// The location of a [`Token`] in form (file name, column, row).
+/// The location of a [`Token`] in the form (file name, column, row).
 pub struct TokenLocation(pub String, pub u32, pub u32);
 
 #[derive(Debug, Clone)]
@@ -98,8 +121,8 @@ impl Display for TokenLocation {
 }
 
 macro_rules! token {
-    ($type:ident$(($($value:expr),+))?, $file:expr, $col:expr, $row:expr) => {
-        Token(TokenType::$type$(($($value),+))?, TokenLocation($file, $col, $row))
+    ($type:expr, $file:expr, $col:expr, $row:expr) => {
+        Token($type, TokenLocation($file, $col, $row))
     };
 }
 
@@ -133,7 +156,7 @@ impl Lexer {
             .content
             .chars()
             .nth(self.index)
-            .ok_or(Error::new(ErrorKind::UnexpectedEof, "End of code!"))?;
+            .ok_or(Error::new(ErrorKind::UnexpectedEof, "Unexpected EOF"))?;
         self.index += 1;
         Ok(cur)
     }
@@ -152,13 +175,18 @@ impl Lexer {
         }
 
         match buf.as_str() {
-            "from" | "to" | "as" | "with" | "step" | "for" | "in" => {
-                self.tokens
-                    .push(token!(Keyword(buf), self.file_path.clone(), col, row))
-            }
-            _ => self
-                .tokens
-                .push(token!(Ident(buf), self.file_path.clone(), col, row)),
+            "from" | "to" | "as" | "with" | "step" | "for" | "in" => self.tokens.push(token!(
+                TokenType::Keyword(buf),
+                self.file_path.clone(),
+                col,
+                row
+            )),
+            _ => self.tokens.push(token!(
+                TokenType::Ident(buf),
+                self.file_path.clone(),
+                col,
+                row
+            )),
         }
 
         Ok(col_delta)
@@ -202,8 +230,12 @@ impl Lexer {
             buf.push_str(".0");
         }
 
-        self.tokens
-            .push(token!(FloatLiteral(buf), self.file_path.clone(), col, row));
+        self.tokens.push(token!(
+            TokenType::FloatLiteral(buf),
+            self.file_path.clone(),
+            col,
+            row
+        ));
 
         Ok(col_delta)
     }
@@ -214,8 +246,12 @@ impl Lexer {
         while self.peek(0).is_some() {
             let c = self.peek(0).unwrap();
             if c == '\n' {
-                self.tokens
-                    .push(token!(Newline, self.file_path.clone(), col, line));
+                self.tokens.push(token!(
+                    TokenType::Newline,
+                    self.file_path.clone(),
+                    col,
+                    line
+                ));
                 line += 1;
                 col = 0;
                 self.consume()?;
@@ -225,65 +261,13 @@ impl Lexer {
                 col += self.parse_text(line, col)?;
             } else if c == '.' || c.is_digit(10) {
                 col += self.parse_float(line, col)?;
-            } else if c == '=' {
-                self.tokens
-                    .push(token!(Equals, self.file_path.clone(), col, line));
-                self.consume()?;
-            } else if c == '+' {
-                self.tokens
-                    .push(token!(Plus, self.file_path.clone(), col, line));
-                self.consume()?;
-            } else if c == '-' {
-                self.tokens
-                    .push(token!(Minus, self.file_path.clone(), col, line));
-                self.consume()?;
-            } else if c == '*' {
-                self.tokens
-                    .push(token!(Multi, self.file_path.clone(), col, line));
-                self.consume()?;
-            } else if c == ',' {
-                self.tokens
-                    .push(token!(Comma, self.file_path.clone(), col, line));
-                self.consume()?;
-            } else if c == '/' {
-                self.tokens
-                    .push(token!(Div, self.file_path.clone(), col, line));
-                self.consume()?;
-            } else if c == '#' {
-                self.tokens
-                    .push(token!(Comment, self.file_path.clone(), col, line));
-                self.consume()?;
-            } else if c == '(' {
-                self.tokens
-                    .push(token!(LeftParen, self.file_path.clone(), col, line));
-                self.consume()?;
-            } else if c == ')' {
-                self.tokens
-                    .push(token!(RightParen, self.file_path.clone(), col, line));
-                self.consume()?;
-            } else if c == '{' {
-                self.tokens
-                    .push(token!(LeftBrace, self.file_path.clone(), col, line));
-                self.consume()?;
-            } else if c == '}' {
-                self.tokens
-                    .push(token!(RightBrace, self.file_path.clone(), col, line));
-                self.consume()?;
-            } else if c == '[' {
-                self.tokens
-                    .push(token!(LeftBracket, self.file_path.clone(), col, line));
-                self.consume()?;
-            } else if c == ']' {
-                self.tokens
-                    .push(token!(RightBracket, self.file_path.clone(), col, line));
-                self.consume()?;
-            } else if c == '^' {
-                self.tokens
-                    .push(token!(Circumflex, self.file_path.clone(), col, line));
-                self.consume()?;
             } else {
-                self.tokens
-                    .push(token!(Unknown(c), self.file_path.clone(), col, line));
+                self.tokens.push(token!(
+                    TokenType::from(c),
+                    self.file_path.clone(),
+                    col,
+                    line
+                ));
                 self.consume()?;
             }
 
