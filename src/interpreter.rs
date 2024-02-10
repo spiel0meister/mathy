@@ -9,6 +9,31 @@ use std::{
     io::{Error, ErrorKind, Result},
 };
 
+#[derive(Debug)]
+enum InterpreterError {
+    UndefinedVariable(String),
+    UndefinedFunction(String),
+    InvalidArguments(String),
+    InvalidListLength,
+}
+
+impl From<InterpreterError> for Error {
+    fn from(value: InterpreterError) -> Error {
+        match value {
+            InterpreterError::UndefinedVariable(name) => {
+                error!(Other, "Undefined variable: {:?}", name)
+            }
+            InterpreterError::UndefinedFunction(name) => {
+                error!(Other, "Undefined function: {:?}", name)
+            }
+            InterpreterError::InvalidListLength => error!(Other, "Lists must be same length!"),
+            InterpreterError::InvalidArguments(name) => {
+                error!(Other, "Invalid arguments for function {:?}!", name)
+            }
+        }
+    }
+}
+
 impl Into<Expr> for Data {
     fn into(self) -> Expr {
         match self {
@@ -49,11 +74,11 @@ impl Display for Data {
     }
 }
 
-fn apply_op(left: Data, right: Data, op: Operator) -> Result<Data> {
+fn apply_op(left: Data, right: Data, op: Operator) -> InterpreterResult<Data> {
     if let Data::List(ref values1) = left {
         if let Data::List(ref values2) = right {
             if values1.len() != values2.len() {
-                return Err(error!(Other, "Lists must be same length!"));
+                return Err(InterpreterError::InvalidListLength);
             }
 
             return Ok(Data::List(
@@ -61,7 +86,7 @@ fn apply_op(left: Data, right: Data, op: Operator) -> Result<Data> {
                     .iter()
                     .zip(values2)
                     .map(|(value1, value2)| apply_op(value1.clone(), value2.clone(), op.clone()))
-                    .map(|res| res.unwrap_or_else(|err| panic!("Error: {}", err)))
+                    .map(|res| res.unwrap_or_else(|err| panic!("Error: {}", Error::from(err))))
                     .collect(),
             ));
         }
@@ -124,6 +149,8 @@ pub struct Interpreter {
     functions: HashMap<String, (Vec<String>, Expr)>,
 }
 
+type InterpreterResult<T> = std::result::Result<T, InterpreterError>;
+
 impl Interpreter {
     pub fn new(parsed: Vec<Parsed>) -> Self {
         Self {
@@ -152,7 +179,7 @@ impl Interpreter {
         &self,
         (parameters, args): (Vec<String>, Vec<Expr>),
         expr: &Expr,
-    ) -> Result<Expr> {
+    ) -> InterpreterResult<Expr> {
         let out: Expr;
 
         match expr {
@@ -166,7 +193,7 @@ impl Interpreter {
                 if let Some(data) = self.get_variable(name) {
                     return Ok(data.into());
                 }
-                return Err(error!(Other, "Undefiend variable: {:?}", name));
+                return Err(InterpreterError::UndefinedVariable(name.to_string()));
             }
             Expr::FunctionCall(name, args) => match name {
                 _ => {
@@ -174,7 +201,7 @@ impl Interpreter {
                         out =
                             self.transform_fn_expr((parameters.to_vec(), args.to_vec()), expr2)?;
                     } else {
-                        return Err(error!(Other, "Undefined function: {:?}", name));
+                        return Err(InterpreterError::UndefinedFunction(name.to_string()));
                     }
                 }
             },
@@ -202,19 +229,19 @@ impl Interpreter {
         Ok(out)
     }
 
-    fn evaluate_expr(&self, expr: &Expr) -> Result<Data> {
+    fn evaluate_expr(&self, expr: &Expr) -> InterpreterResult<Data> {
         match expr {
             Expr::Ident(name) => {
                 if let Some(data) = self.get_variable(name) {
                     return Ok(data.clone());
                 } else {
-                    return Err(error!(Other, "Undefined variable: {:?}", name));
+                    return Err(InterpreterError::UndefinedVariable(name.to_string()));
                 }
             }
             Expr::FloatLiteral(value) => Ok(Data::Float(
                 value
                     .parse()
-                    .map_err(|err| error!(InvalidInput, "{}", err))?,
+                    .map_err(|_| unreachable!("Invalid value: {:?}", value))?,
             )),
             Expr::Expr(left, op, right) => {
                 let left = self.evaluate_expr(&left)?;
@@ -224,38 +251,38 @@ impl Interpreter {
             Expr::NegFloatLiteral(value) => {
                 let value_f64: f64 = value
                     .parse()
-                    .map_err(|err| error!(InvalidInput, "{}", err))?;
+                    .map_err(|_| unreachable!("Invalid value: {:?}", value))?;
                 Ok(Data::Float(-1.0 * value_f64))
             }
             Expr::FunctionCall(name, args) => match name.as_str() {
                 "sin" => {
                     if args.len() > 1 {
-                        return Err(error!(Other, "Too many arguments for sin!"));
+                        return Err(InterpreterError::InvalidArguments("sin".to_string()));
                     }
                     let arg = self.evaluate_expr(&args[0])?;
                     Ok(apply_func(arg, |arg| Data::Float(arg.sin())))
                 }
                 "cos" => {
                     if args.len() > 1 {
-                        return Err(error!(Other, "Too many arguments for cos!"));
+                        return Err(InterpreterError::InvalidArguments("cos".to_string()));
                     }
                     let arg = self.evaluate_expr(&args[0])?;
                     Ok(apply_func(arg, |arg| Data::Float(arg.cos())))
                 }
                 "tan" => {
                     if args.len() > 1 {
-                        return Err(error!(Other, "Too many arguments for tan!"));
+                        return Err(InterpreterError::InvalidArguments("tan".to_string()));
                     }
                     let arg = self.evaluate_expr(&args[0])?;
                     Ok(apply_func(arg, |arg| Data::Float(arg.tan())))
                 }
                 _ => {
                     let Some((parameters, expr)) = self.functions.get(name) else {
-                        return Err(error!(Other, "Undefined function: {:?}", name));
+                        return Err(InterpreterError::UndefinedFunction(name.to_string()));
                     };
 
                     if args.len() != parameters.len() {
-                        return Err(error!(Other, "Parameters incorrect!"));
+                        return Err(InterpreterError::InvalidArguments(name.to_string()));
                     }
 
                     let parsable =
@@ -277,13 +304,11 @@ impl Interpreter {
         }
     }
 
-    fn clean_scope(&mut self, scope: Scope) -> Result<()> {
+    fn clean_scope(&mut self, scope: Scope) {
         for name in &scope {
             self.variables.remove(name);
             self.functions.remove(name);
         }
-
-        Ok(())
     }
 
     fn function_exits(&self, name: &str) -> bool {
@@ -361,15 +386,17 @@ impl Interpreter {
                     self.variables.insert(name.to_string(), Data::Float(i));
                     while i <= max {
                         let scope = self.execute_block(block.to_vec())?;
-                        self.clean_scope(scope)?;
+                        self.clean_scope(scope);
                         i += step;
-                        *self.variables.get_mut(&name).unwrap() = Data::Float(i);
+                        if let Some(value) = self.variables.get_mut(&name) {
+                            *value = Data::Float(i);
+                        }
                     }
                     self.variables.remove(&name);
                 }
                 Parsed::Block(block) => {
                     let scope = self.execute_block(block)?;
-                    self.clean_scope(scope)?;
+                    self.clean_scope(scope);
                 }
                 Parsed::ForLoop(ident_expr, list_expr, block) => {
                     let list = match self.evaluate_expr(&list_expr)? {
@@ -383,8 +410,10 @@ impl Interpreter {
                         .insert(name.clone(), list.get(0).unwrap().clone());
                     for data in &list[1..] {
                         let scope = self.execute_block(block.clone())?;
-                        self.clean_scope(scope)?;
-                        *self.variables.get_mut(&name).unwrap() = data.clone();
+                        self.clean_scope(scope);
+                        if let Some(value) = self.variables.get_mut(&name) {
+                            *value = data.clone();
+                        }
                     }
                     self.variables.remove(&name);
                 }
@@ -420,9 +449,8 @@ impl Interpreter {
     }
 
     pub fn interpret(&mut self) -> Result<()> {
-        // println!("{:?}", &self.parsed);
         let scope = self.execute_block(self.parsed.clone())?;
-        self.clean_scope(scope)?;
+        self.clean_scope(scope);
 
         Ok(())
     }

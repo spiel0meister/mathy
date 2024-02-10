@@ -1,6 +1,6 @@
-use std::io::{Error, ErrorKind, Result};
+use std::io::{Error, ErrorKind};
 
-use crate::lexer::{Token, TokenType};
+use crate::lexer::{Token, TokenLocation, TokenType};
 use crate::util::error;
 
 #[derive(Debug, Clone)]
@@ -45,6 +45,43 @@ pub enum Parsed {
     PrintExpr(Expr),
 }
 
+#[derive(Debug)]
+pub enum ParseError {
+    EOF,
+    MissingLiteral(TokenLocation),
+    UnexpectedToken(TokenType, TokenLocation),
+    UnexpectedKeyword(String, TokenLocation),
+    Expected(String, TokenLocation),
+    ExpectedGot(String, String, TokenLocation),
+    ExpectedGotToken(String, TokenType, TokenLocation),
+}
+
+impl From<ParseError> for Error {
+    fn from(value: ParseError) -> Error {
+        match value {
+            ParseError::EOF => error!(UnexpectedEof, "End of tokens!"),
+            ParseError::MissingLiteral(loc) => error!(Other, "Missing literal at {}", loc),
+            ParseError::UnexpectedToken(t, loc) => {
+                error!(Other, "Unexpected token {} at {}", t, loc)
+            }
+            ParseError::UnexpectedKeyword(keyword, loc) => {
+                error!(Other, "Unexpected keyword {:?} at {}", keyword, loc)
+            }
+            ParseError::Expected(expected, loc) => {
+                error!(Other, "Expected {:?} at {}", expected, loc)
+            }
+            ParseError::ExpectedGot(expected, got, loc) => {
+                error!(Other, "Expected {:?}, got {:?} at {}", expected, got, loc)
+            }
+            ParseError::ExpectedGotToken(expected, got, loc) => {
+                error!(Other, "Expected {:?}, got {} at {}", expected, got, loc)
+            }
+        }
+    }
+}
+
+type ParseResult<T> = std::result::Result<T, ParseError>;
+
 pub struct Parser {
     tokens: Vec<Token>,
     parsed: Vec<Parsed>,
@@ -76,17 +113,17 @@ impl Parser {
         }
     }
 
-    fn consume(&mut self) -> Result<&Token> {
+    fn consume(&mut self) -> ParseResult<&Token> {
         if self.index < self.tokens.len() {
             let cur = &self.tokens[self.index];
             self.index += 1;
             Ok(cur)
         } else {
-            Err(error!(Other, "End of tokens!"))
+            Err(ParseError::EOF)
         }
     }
 
-    fn parse_expr(&mut self, min_prec: usize, is_function: bool) -> Result<Expr> {
+    fn parse_expr(&mut self, min_prec: usize, is_function: bool) -> ParseResult<Expr> {
         let mut left: Expr;
         if self.peek(0).is_some() {
             let token = self.peek(0).unwrap().clone();
@@ -119,7 +156,7 @@ impl Parser {
                 }
             } else if let TokenType::Minus = token_type {
                 let Some(Token(TokenType::FloatLiteral(val), _)) = self.peek(1) else {
-                    return Err(error!(InvalidData, "Missing literal at {}", loc));
+                    return Err(ParseError::MissingLiteral(loc.clone()));
                 };
                 left = Expr::NegFloatLiteral(val.to_string());
                 self.consume()?;
@@ -142,16 +179,11 @@ impl Parser {
 
                 left = Expr::List(out);
             } else {
-                return Err(error!(
-                    InvalidData,
-                    "Unexpected token {} at {}",
-                    token.clone().exclude_loc(),
-                    loc
-                ));
+                return Err(ParseError::UnexpectedToken(token_type.clone(), loc.clone()));
             }
             self.consume()?;
         } else {
-            return Err(error!(UnexpectedEof, "End of tokens!"));
+            return Err(ParseError::EOF);
         }
 
         loop {
@@ -185,7 +217,7 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_block(&mut self) -> Result<Vec<Parsed>> {
+    fn parse_block(&mut self) -> ParseResult<Vec<Parsed>> {
         let mut block: Vec<Parsed> = Vec::new();
         self.consume()?;
         while self
@@ -216,7 +248,10 @@ impl Parser {
                 }
                 TokenType::Keyword(keyword) => {
                     if keyword.as_str() != "from" {
-                        return Err(error!(Other, "Unexpected keyword {:?} at {}", keyword, loc));
+                        return Err(ParseError::UnexpectedKeyword(
+                            keyword.to_string(),
+                            loc.clone(),
+                        ));
                     }
                     let out = self.parse_from_block()?;
                     block.push(out);
@@ -242,15 +277,19 @@ impl Parser {
         Ok(block)
     }
 
-    fn parse_for_block(&mut self) -> Result<Parsed> {
+    fn parse_for_block(&mut self) -> ParseResult<Parsed> {
         self.consume()?;
         let ident = self.parse_expr(1, false)?;
         let t = self.consume()?;
-        let Token(TokenType::Keyword(keyword), _) = t else {
-            return Err(error!(Other, "Expected \"in\" at {}", t.1));
+        let Token(TokenType::Keyword(keyword), loc) = t else {
+            return Err(ParseError::Expected("in".to_string(), t.1.clone()));
         };
         if keyword.as_str() != "in" {
-            return Err(error!(Other, "Expected \"in\", got {} at {}", keyword, t.1));
+            return Err(ParseError::ExpectedGot(
+                "in".to_string(),
+                keyword.to_string(),
+                loc.clone(),
+            ));
         };
         let list = self.parse_expr(1, false)?;
         let block: Vec<Parsed> = self.parse_block()?;
@@ -258,28 +297,36 @@ impl Parser {
         Ok(Parsed::ForLoop(ident, list, block))
     }
 
-    fn parse_from_block(&mut self) -> Result<Parsed> {
+    fn parse_from_block(&mut self) -> ParseResult<Parsed> {
         self.consume()?;
         let min = self.parse_expr(1, false)?;
         let t = self.consume()?;
-        let Token(TokenType::Keyword(keyword), _) = t else {
-            return Err(error!(Other, "Expected \"to\" at {}", t.1));
+        let Token(TokenType::Keyword(keyword), loc) = t else {
+            return Err(ParseError::Expected("to".to_string(), t.1.clone()));
         };
         if keyword.as_str() != "to" {
-            return Err(error!(Other, "Expected \"to\", got {} at {}", keyword, t.1));
+            return Err(ParseError::ExpectedGot(
+                "to".to_string(),
+                keyword.to_string(),
+                loc.clone(),
+            ));
         };
         let max = self.parse_expr(1, false)?;
         let t = self.consume()?;
-        let Token(TokenType::Keyword(keyword), _) = t else {
-            return Err(error!(Other, "Expected \"as\" at {}", t.1));
+        let Token(TokenType::Keyword(keyword), loc) = t else {
+            return Err(ParseError::Expected("as".to_string(), t.1.clone()));
         };
         if keyword.as_str() != "as" {
-            return Err(error!(Other, "Expected \"to\", got {} at {}", keyword, t.1));
+            return Err(ParseError::ExpectedGot(
+                "as".to_string(),
+                keyword.to_string(),
+                loc.clone(),
+            ));
         };
         let ident = self.parse_expr(1, false)?;
         let mut step: Expr = Expr::FloatLiteral("1.0".to_string());
         let Some(t) = self.peek(0) else {
-            return Err(error!(UnexpectedEof, "Unexpected EOF"));
+            return Err(ParseError::EOF);
         };
         let t = t.clone();
         if let Token(TokenType::Keyword(keyword), loc) = t {
@@ -291,19 +338,17 @@ impl Parser {
                         step = self.parse_expr(1, false)?;
                         self.consume()?;
                     } else {
-                        return Err(error!(
-                            Other,
-                            "Expected \"step\" keyword, got {:?} keyword at {}",
-                            keyword.clone(),
-                            loc
+                        return Err(ParseError::ExpectedGot(
+                            "step".to_string(),
+                            keyword.to_string(),
+                            loc.clone(),
                         ));
                     }
                 } else {
-                    return Err(error!(
-                        Other,
-                        "Expected \"step\" keyword, got {} at {}",
+                    return Err(ParseError::ExpectedGotToken(
+                        "step".to_string(),
                         t.clone().exclude_loc(),
-                        loc
+                        loc.clone(),
                     ));
                 };
             }
@@ -315,14 +360,14 @@ impl Parser {
         Ok(Parsed::FromLoop(min, max, ident, step, block))
     }
 
-    fn parse_declaration(&mut self, ident: Token) -> Result<Parsed> {
+    fn parse_declaration(&mut self, ident: Token) -> ParseResult<Parsed> {
         self.consume()?;
         self.consume()?;
         let expr = self.parse_expr(1, false)?;
         Ok(Parsed::Declaration(ident, expr))
     }
 
-    fn parse_function_declaration(&mut self, ident: Token) -> Result<Parsed> {
+    fn parse_function_declaration(&mut self, ident: Token) -> ParseResult<Parsed> {
         let mut parameters: Vec<Token> = Vec::new();
         self.consume()?;
         self.consume()?;
@@ -342,7 +387,7 @@ impl Parser {
         Ok(Parsed::FunctionDecleration(ident, parameters, expr))
     }
 
-    fn parse_print(&mut self) -> Result<Parsed> {
+    fn parse_print(&mut self) -> ParseResult<Parsed> {
         let expr = self.parse_expr(1, false)?;
         // println!("{:?}", expr);
 
@@ -367,7 +412,7 @@ impl Parser {
         return false;
     }
 
-    pub fn parse(&mut self) -> Result<Vec<Parsed>> {
+    pub fn parse(&mut self) -> ParseResult<Vec<Parsed>> {
         while let Some(Token(token_type, loc)) = self.peek(0) {
             let token = self.peek(0).unwrap().clone();
             match token_type {
@@ -399,7 +444,13 @@ impl Parser {
                         let out = self.parse_for_block()?;
                         self.parsed.push(out);
                     }
-                    _ => return Err(error!(Other, "Unexpected keyword {} at {}", keyword, loc)),
+                    _ => {
+                        return Err(ParseError::ExpectedGot(
+                            "for".to_string(),
+                            keyword.clone(),
+                            loc.clone(),
+                        ))
+                    }
                 },
                 TokenType::LeftBracket => {
                     if self.line_contains_equals() {

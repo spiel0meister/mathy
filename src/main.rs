@@ -30,9 +30,7 @@ fn main() -> Result<()> {
     let mut parser = Parser::new(out);
     let out = parser.parse();
     if let Err(err) = out {
-        if let Some(msg) = err.into_inner() {
-            eprintln!("{}", msg);
-        }
+        eprintln!("{}", Error::from(err));
         exit(1);
     }
 
